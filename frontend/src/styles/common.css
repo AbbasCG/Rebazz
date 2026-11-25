@@ -1,0 +1,206 @@
+/* ==========================================================
+   Rebazz — gedeelde ontwerptokens en componenten
+   ========================================================== */
+:root {
+  --bg: #f6f5f1;
+  --surface: #ffffff;
+  --surface-2: #f1efe9;
+  --surface-3: #e9e6de;
+  --ink: #14161b;
+  --ink-2: #353a45;
+  --muted: #6b7080;
+  --line: #e3e0d7;
+  --line-strong: #cfcbc0;
+  --accent: #1d4ed8;
+  --accent-hover: #1a43bb;
+  --accent-soft: #e7edfc;
+  --accent-ink: #ffffff;
+  --gold: #9a6b1f;
+  --gold-soft: #f6eedd;
+  --success: #15724a;
+  --success-soft: #e2f2e9;
+  --warn: #9a5b00;
+  --warn-soft: #fbefd9;
+  --danger: #b42318;
+  --danger-soft: #fbe6e3;
+  --info: #0e6390;
+  --info-soft: #e1f0f8;
+  --radius-sm: 8px;
+  --radius: 12px;
+  --radius-lg: 20px;
+  --shadow-sm: 0 1px 2px rgba(20, 22, 27, .06);
+  --shadow: 0 1px 2px rgba(20, 22, 27, .05), 0 8px 24px rgba(20, 22, 27, .07);
+  --shadow-lg: 0 24px 64px rgba(20, 22, 27, .18);
+  --font: 'Inter Variable', 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --serif: 'Fraunces Variable', 'Fraunces', Georgia, 'Times New Roman', serif;
+  /* Vlakken en knoppen die in beide thema's contrasteren */
+  --solid: #14161b;
+  --solid-hover: #2a2e37;
+  --on-solid: #ffffff;
+  --night: #121419;           /* altijd-donkere banden (aankondiging, zijbalk) */
+  --header-bg: rgba(246, 245, 241, .9);
+  --dash-bg: #f4f3ef;
+  --row-hover: #fafaf7;
+  --ai-draft-bg: #f7f9ff;
+  --star: #d39b25;
+  --pv-l1: 94%;
+  --pv-l2: 83%;
+  --pv-fg: 28%;
+  --pv-glow: .75;
+  color-scheme: light;
+}
+
+/* Donkere modus: volgt het systeem, tenzij de bezoeker zelf kiest (data-theme) */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #111215; --surface: #1a1c21; --surface-2: #23262d; --surface-3: #2d3139;
+    --ink: #ecebe6; --ink-2: #c5c7ce; --muted: #8f94a2; --line: #2b2e36; --line-strong: #3c404a;
+    --accent: #7d9bff; --accent-hover: #95adff; --accent-soft: #1d2744; --accent-ink: #0b1020;
+    --gold: #d9b06a; --gold-soft: #2f2718; --success: #55c891; --success-soft: #14291f;
+    --warn: #e5a54b; --warn-soft: #2f2513; --danger: #f2796f; --danger-soft: #341b19; --info: #66b9e4; --info-soft: #132b37;
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, .4); --shadow: 0 1px 2px rgba(0, 0, 0, .35), 0 8px 24px rgba(0, 0, 0, .35); --shadow-lg: 0 24px 64px rgba(0, 0, 0, .55);
+    --solid: #f1f0eb; --solid-hover: #ffffff; --on-solid: #14161b;
+    --header-bg: rgba(17, 18, 21, .86); --dash-bg: #0e0f12; --row-hover: #20232a; --ai-draft-bg: #161d33; --star: #e3b04b;
+    --pv-l1: 24%; --pv-l2: 17%; --pv-fg: 82%; --pv-glow: .1;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #111215; --surface: #1a1c21; --surface-2: #23262d; --surface-3: #2d3139;
+  --ink: #ecebe6; --ink-2: #c5c7ce; --muted: #8f94a2; --line: #2b2e36; --line-strong: #3c404a;
+  --accent: #7d9bff; --accent-hover: #95adff; --accent-soft: #1d2744; --accent-ink: #0b1020;
+  --gold: #d9b06a; --gold-soft: #2f2718; --success: #55c891; --success-soft: #14291f;
+  --warn: #e5a54b; --warn-soft: #2f2513; --danger: #f2796f; --danger-soft: #341b19; --info: #66b9e4; --info-soft: #132b37;
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, .4); --shadow: 0 1px 2px rgba(0, 0, 0, .35), 0 8px 24px rgba(0, 0, 0, .35); --shadow-lg: 0 24px 64px rgba(0, 0, 0, .55);
+  --solid: #f1f0eb; --solid-hover: #ffffff; --on-solid: #14161b;
+  --header-bg: rgba(17, 18, 21, .86); --dash-bg: #0e0f12; --row-hover: #20232a; --ai-draft-bg: #161d33; --star: #e3b04b;
+  --pv-l1: 24%; --pv-l2: 17%; --pv-fg: 82%; --pv-glow: .1;
+  color-scheme: dark;
+}
+
+/* Thema-schakelaar */
+.theme-toggle .icon-moon { display: none; }
+:root[data-theme="dark"] .theme-toggle .icon-sun { display: none; }
+:root[data-theme="dark"] .theme-toggle .icon-moon { display: block; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .theme-toggle .icon-sun { display: none; }
+  :root:not([data-theme="light"]) .theme-toggle .icon-moon { display: block; }
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0;
+  font-family: var(--font);
+  font-size: 15px;
+  line-height: 1.55;
+  color: var(--ink);
+  background: var(--bg);
+  -webkit-font-smoothing: antialiased;
+}
+img, svg { display: block; max-width: 100%; }
+a { color: inherit; }
+button, input, select, textarea { font: inherit; color: inherit; }
+h1, h2, h3, h4 { margin: 0; line-height: 1.15; letter-spacing: -0.02em; }
+p { margin: 0; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
+
+.icon { width: 18px; height: 18px; flex: none; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.icon-fill { fill: currentColor; stroke: none; }
+
+/* Knoppen */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  height: 42px; padding: 0 18px; border-radius: 10px; border: 1px solid transparent;
+  font-weight: 600; font-size: 14px; cursor: pointer; text-decoration: none; white-space: nowrap;
+  transition: background .15s, border-color .15s, color .15s, transform .05s;
+}
+.btn:active { transform: translateY(1px); }
+.btn-primary { background: var(--solid); color: var(--on-solid); }
+.btn-primary:hover { background: var(--solid-hover); }
+.btn-accent { background: var(--accent); color: var(--accent-ink); }
+.btn-accent:hover { background: var(--accent-hover); }
+.btn-outline { background: var(--surface); border-color: var(--line-strong); color: var(--ink); }
+.btn-outline:hover { border-color: var(--ink); }
+.btn-ghost { background: transparent; color: var(--ink-2); }
+.btn-ghost:hover { background: var(--surface-2); }
+.btn-danger { background: var(--danger-soft); color: var(--danger); }
+.btn-sm { height: 34px; padding: 0 12px; font-size: 13px; border-radius: 8px; }
+.btn-lg { height: 52px; padding: 0 26px; font-size: 15px; border-radius: 12px; }
+.btn-block { width: 100%; }
+.btn[disabled] { opacity: .5; pointer-events: none; }
+.icon-btn {
+  display: inline-grid; place-items: center; width: 40px; height: 40px; border-radius: 10px;
+  border: 0; background: transparent; cursor: pointer; color: var(--ink-2); position: relative; flex: none;
+}
+.icon-btn:hover { background: var(--surface-2); color: var(--ink); }
+
+/* Formulieren */
+.field { display: flex; flex-direction: column; gap: 6px; }
+.field label, .label { font-size: 13px; font-weight: 600; color: var(--ink-2); }
+.input, .select, .textarea {
+  width: 100%; height: 44px; padding: 0 14px; border-radius: 10px;
+  border: 1px solid var(--line-strong); background: var(--surface); outline: none;
+  transition: border-color .15s, box-shadow .15s;
+}
+.textarea { height: auto; min-height: 96px; padding: 12px 14px; resize: vertical; }
+.input:focus, .select:focus, .textarea:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+.hint { font-size: 12.5px; color: var(--muted); }
+
+/* Badges */
+.badge {
+  display: inline-flex; align-items: center; gap: 6px; height: 24px; padding: 0 10px;
+  border-radius: 999px; font-size: 12px; font-weight: 600; white-space: nowrap;
+  background: var(--surface-2); color: var(--ink-2);
+}
+.badge::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: currentColor; opacity: .8; }
+.badge.plain::before { display: none; }
+.badge.success { background: var(--success-soft); color: var(--success); }
+.badge.warn { background: var(--warn-soft); color: var(--warn); }
+.badge.danger { background: var(--danger-soft); color: var(--danger); }
+.badge.info { background: var(--info-soft); color: var(--info); }
+.badge.accent { background: var(--accent-soft); color: var(--accent); }
+.badge.gold { background: var(--gold-soft); color: var(--gold); }
+
+/* Schakelaar */
+.switch { position: relative; display: inline-block; width: 40px; height: 23px; flex: none; }
+.switch input { opacity: 0; width: 0; height: 0; position: absolute; }
+.switch span { position: absolute; inset: 0; border-radius: 999px; background: var(--line-strong); cursor: pointer; transition: background .2s; }
+.switch span::after { content: ''; position: absolute; left: 3px; top: 3px; width: 17px; height: 17px; border-radius: 50%; background: #fff; box-shadow: var(--shadow-sm); transition: transform .2s; }
+.switch input:checked + span { background: var(--success); }
+.switch input:checked + span::after { transform: translateX(17px); }
+.switch input:focus-visible + span { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* Productvisual (vervangt productfoto's in het prototype) */
+.pv {
+  position: relative; overflow: hidden; display: grid; place-items: center;
+  background: linear-gradient(150deg, hsl(var(--h) 38% var(--pv-l1)), hsl(var(--h) 34% var(--pv-l2)));
+  color: hsl(var(--h) 32% var(--pv-fg));
+}
+.pv::after {
+  content: ''; position: absolute; width: 70%; aspect-ratio: 1; border-radius: 50%;
+  background: radial-gradient(circle, hsla(var(--h), 60%, 100%, var(--pv-glow)), transparent 70%);
+}
+.pv .icon { width: 38%; height: 38%; stroke-width: 1.15; position: relative; z-index: 1; }
+.pv.has-img { background: #fff; }
+.pv.has-img::after { display: none; }
+.pv.has-img img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+
+/* Melding (toast) */
+.toast-wrap { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); z-index: 200; display: flex; flex-direction: column; gap: 8px; width: min(420px, calc(100% - 32px)); pointer-events: none; }
+.toast {
+  display: flex; align-items: center; gap: 10px; padding: 12px 16px; border-radius: 12px;
+  background: var(--night); color: #fff; font-size: 14px; box-shadow: var(--shadow-lg);
+  animation: toast-in .25s ease-out;
+}
+.toast .icon { color: #7ee2a8; }
+@keyframes toast-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+
+.visually-hidden { position: absolute !important; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.muted { color: var(--muted); }
+.strike { text-decoration: line-through; color: var(--muted); }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; }
+}

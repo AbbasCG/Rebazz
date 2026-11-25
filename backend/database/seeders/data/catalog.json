@@ -1,0 +1,462 @@
+{
+ "brand": {
+  "name": "Rebazz",
+  "domain": "rebazz.nl",
+  "email": "info@rebazz.nl",
+  "company": "Rebazz",
+  "kvk": "90147146",
+  "btw": "NL004792143B90",
+  "address": "Beemd 15, 4816 HB Breda, Nederland",
+  "returnAddress": "Beemd 15, 4816 HB Breda, Nederland"
+ },
+ "currency": "eur",
+ "zones": [
+  {
+   "id": "benelux",
+   "name": "Nederland, België & Luxemburg",
+   "countries": [
+    "NL",
+    "BE",
+    "LU"
+   ],
+   "rate": 4.95,
+   "freeFrom": 49,
+   "days": [
+    3,
+    6
+   ],
+   "vat": true,
+   "express": 12.95
+  },
+  {
+   "id": "eu",
+   "name": "Europese Unie",
+   "countries": [
+    "DE",
+    "FR",
+    "ES",
+    "IT",
+    "AT",
+    "PT",
+    "IE",
+    "PL",
+    "SE",
+    "DK",
+    "FI",
+    "CZ",
+    "GR"
+   ],
+   "rate": 6.95,
+   "freeFrom": 69,
+   "days": [
+    5,
+    9
+   ],
+   "vat": true,
+   "express": 12.95
+  },
+  {
+   "id": "europe",
+   "name": "Overig Europa",
+   "countries": [
+    "GB",
+    "CH",
+    "NO"
+   ],
+   "rate": 9.95,
+   "freeFrom": 89,
+   "days": [
+    6,
+    11
+   ],
+   "vat": false,
+   "express": 24.95
+  },
+  {
+   "id": "na",
+   "name": "Noord-Amerika",
+   "countries": [
+    "US",
+    "CA"
+   ],
+   "rate": 9.95,
+   "freeFrom": 89,
+   "days": [
+    7,
+    12
+   ],
+   "vat": false,
+   "express": 24.95
+  },
+  {
+   "id": "world",
+   "name": "Rest van de wereld",
+   "countries": [
+    "AU",
+    "NZ",
+    "JP",
+    "SG",
+    "AE",
+    "SA",
+    "TR",
+    "MA",
+    "ZA",
+    "BR",
+    "MX",
+    "IN",
+    "KR"
+   ],
+   "rate": 14.95,
+   "freeFrom": 129,
+   "days": [
+    9,
+    16
+   ],
+   "vat": false,
+   "express": 0
+  }
+ ],
+ "reviews": [],
+ "products": [
+  {
+   "id": "p1",
+   "sku": "RB-AUD-001",
+   "name": "Aura draadloze koptelefoon met ANC",
+   "category": "Audio",
+   "price": 79.95,
+   "compare": null,
+   "cost": 24.1,
+   "image": "",
+   "icon": "headphones",
+   "hue": 222,
+   "supplier": "CJdropshipping",
+   "supplierUrl": "",
+   "cjVid": "",
+   "cjFrom": "PL",
+   "cjLogistic": "",
+   "warehouse": "EU (Polen)",
+   "days": [
+    3,
+    6
+   ],
+   "stock": 412,
+   "rating": 0,
+   "reviews": 0,
+   "sold": 0,
+   "status": "active",
+   "description": "Geniet van studiokwaliteit geluid zonder afleiding. Actieve ruisonderdrukking, 40 uur speeltijd en een lichtgewicht ontwerp voor de hele dag.",
+   "features": [
+    "Actieve ruisonderdrukking (ANC)",
+    "40 uur batterijduur",
+    "Bluetooth 5.3 met multipoint",
+    "Inklapbaar met opbergetui"
+   ]
+  },
+  {
+   "id": "p2",
+   "sku": "RB-HOM-014",
+   "name": "Lumen minimalistische tafellamp",
+   "category": "Wonen",
+   "price": 49.95,
+   "compare": null,
+   "cost": 13.8,
+   "image": "",
+   "icon": "lamp",
+   "hue": 36,
+   "supplier": "Zendrop",
+   "supplierUrl": "",
+   "cjVid": "",
+   "cjFrom": "DE",
+   "cjLogistic": "",
+   "warehouse": "EU (Duitsland)",
+   "days": [
+    3,
+    7
+   ],
+   "stock": 188,
+   "rating": 0,
+   "reviews": 0,
+   "sold": 0,
+   "status": "active",
+   "description": "Een tijdloze lamp die elke ruimte sfeer geeft. Traploos dimbaar met drie lichtkleuren en een draadloos oplaadbare basis.",
+   "features": [
+    "Traploos dimbaar",
+    "3 lichttemperaturen",
+    "Oplaadbaar via USB-C",
+    "Aanraakbediening"
+   ]
+  },
+  {
+   "id": "p3",
+   "sku": "RB-TEC-007",
+   "name": "Chrono smartwatch Pro",
+   "category": "Tech",
+   "price": 89.95,
+   "compare": null,
+   "cost": 27.5,
+   "image": "",
+   "icon": "watch",
+   "hue": 205,
+   "supplier": "CJdropshipping",
+   "supplierUrl": "",
+   "cjVid": "",
+   "cjFrom": "CN",
+   "cjLogistic": "",
+   "warehouse": "China",
+   "days": [
+    7,
+    12
+   ],
+   "stock": 960,
+   "rating": 0,
+   "reviews": 0,
+   "sold": 0,
+   "status": "active",
+   "description": "Houd uw gezondheid en activiteiten moeiteloos bij. AMOLED-scherm, hartslag- en slaapmeting en tot 10 dagen batterijduur.",
+   "features": [
+    "1,43\" AMOLED-scherm",
+    "Hartslag, SpO2 en slaap",
+    "Waterdicht (5 ATM)",
+    "Tot 10 dagen batterij"
+   ]
+  },
+  {
+   "id": "p4",
+   "sku": "RB-BEA-021",
+   "name": "Velvet Glow serumset (3 stuks)",
+   "category": "Beauty",
+   "price": 34.95,
+   "compare": null,
+   "cost": 7.9,
+   "image": "",
+   "icon": "sparkles",
+   "hue": 332,
+   "supplier": "Spocket",
+   "supplierUrl": "",
+   "cjVid": "",
+   "cjFrom": "FR",
+   "cjLogistic": "",
+   "warehouse": "EU (Frankrijk)",
+   "days": [
+    3,
+    6
+   ],
+   "stock": 274,
+   "rating": 0,
+   "reviews": 0,
+   "sold": 0,
+   "status": "draft",
+   "description": "Een complete verzorgingsroutine met hyaluronzuur, vitamine C en niacinamide. Dermatologisch getest en vrij van parabenen.",
+   "features": [
+    "Hyaluronzuur, vitamine C, niacinamide",
+    "Dermatologisch getest",
+    "Vegan en dierproefvrij",
+    "Alleen verkopen met CPNP-registratie"
+   ]
+  },
+  {
+   "id": "p5",
+   "sku": "RB-TRV-003",
+   "name": "Voyager anti-diefstal rugzak",
+   "category": "Reizen",
+   "price": 59.95,
+   "compare": null,
+   "cost": 18.4,
+   "image": "",
+   "icon": "bag",
+   "hue": 162,
+   "supplier": "Zendrop",
+   "supplierUrl": "",
+   "cjVid": "",
+   "cjFrom": "US",
+   "cjLogistic": "",
+   "warehouse": "VS",
+   "days": [
+    5,
+    9
+   ],
+   "stock": 336,
+   "rating": 0,
+   "reviews": 0,
+   "sold": 0,
+   "status": "active",
+   "description": "Ontworpen voor de moderne reiziger. Verborgen ritsen, snijbestendig materiaal en een geïntegreerde USB-oplaadpoort.",
+   "features": [
+    "Verborgen ritsvakken",
+    "Waterafstotend en snijbestendig",
+    "Laptopvak tot 15,6\"",
+    "USB-oplaadpoort"
+   ]
+  },
+  {
+   "id": "p6",
+   "sku": "RB-TEC-019",
+   "name": "PowerDock 3-in-1 draadloze lader",
+   "category": "Tech",
+   "price": 39.95,
+   "compare": null,
+   "cost": 9.6,
+   "image": "",
+   "icon": "zap",
+   "hue": 258,
+   "supplier": "CJdropshipping",
+   "supplierUrl": "",
+   "cjVid": "",
+   "cjFrom": "PL",
+   "cjLogistic": "",
+   "warehouse": "EU (Polen)",
+   "days": [
+    3,
+    6
+   ],
+   "stock": 705,
+   "rating": 0,
+   "reviews": 0,
+   "sold": 0,
+   "status": "active",
+   "description": "Laad uw telefoon, smartwatch en oordopjes tegelijk op. Snel, veilig en opvouwbaar voor onderweg.",
+   "features": [
+    "15W snelladen",
+    "Telefoon, horloge en oordopjes",
+    "Opvouwbaar ontwerp",
+    "Bescherming tegen oververhitting"
+   ]
+  },
+  {
+   "id": "p7",
+   "sku": "RB-SPT-002",
+   "name": "FlexFit verstelbare dumbbells (set)",
+   "category": "Sport",
+   "price": 119,
+   "compare": null,
+   "cost": 46,
+   "image": "",
+   "icon": "dumbbell",
+   "hue": 12,
+   "supplier": "Spocket",
+   "supplierUrl": "",
+   "cjVid": "",
+   "cjFrom": "NL",
+   "cjLogistic": "",
+   "warehouse": "EU (Nederland)",
+   "days": [
+    2,
+    4
+   ],
+   "stock": 64,
+   "rating": 0,
+   "reviews": 0,
+   "sold": 0,
+   "status": "active",
+   "description": "Vervangt vijftien paar halters. Wissel in seconden van 2 tot 24 kg met het draaimechanisme.",
+   "features": [
+    "2 tot 24 kg per halter",
+    "Snel verstelbaar",
+    "Compacte opslag",
+    "Inclusief standaard"
+   ]
+  },
+  {
+   "id": "p8",
+   "sku": "RB-KIT-011",
+   "name": "Brew barista melkopschuimer",
+   "category": "Keuken",
+   "price": 29.95,
+   "compare": null,
+   "cost": 6.2,
+   "image": "",
+   "icon": "coffee",
+   "hue": 24,
+   "supplier": "AliExpress (via DSers)",
+   "supplierUrl": "",
+   "cjVid": "",
+   "cjFrom": "CN",
+   "cjLogistic": "",
+   "warehouse": "China",
+   "days": [
+    8,
+    14
+   ],
+   "stock": 1200,
+   "rating": 0,
+   "reviews": 0,
+   "sold": 0,
+   "status": "active",
+   "description": "Romig melkschuim voor cappuccino en latte, warm of koud. Eén knop, vier standen en eenvoudig te reinigen.",
+   "features": [
+    "Warm en koud opschuimen",
+    "4 programma's",
+    "Antiaanbaklaag",
+    "Automatische uitschakeling"
+   ]
+  },
+  {
+   "id": "p9",
+   "sku": "RB-PET-005",
+   "name": "Cozy orthopedisch hondenbed",
+   "category": "Huisdieren",
+   "price": 64.95,
+   "compare": null,
+   "cost": 21,
+   "image": "",
+   "icon": "heart",
+   "hue": 350,
+   "supplier": "Zendrop",
+   "supplierUrl": "",
+   "cjVid": "",
+   "cjFrom": "DE",
+   "cjLogistic": "",
+   "warehouse": "EU (Duitsland)",
+   "days": [
+    3,
+    7
+   ],
+   "stock": 142,
+   "rating": 0,
+   "reviews": 0,
+   "sold": 0,
+   "status": "active",
+   "description": "Ondersteunend traagschuim voor gewrichten en een afneembare, wasbare hoes. Geschikt voor middelgrote en grote honden.",
+   "features": [
+    "Orthopedisch traagschuim",
+    "Afneembare wasbare hoes",
+    "Antislip onderkant",
+    "Verkrijgbaar in 3 maten"
+   ]
+  },
+  {
+   "id": "p10",
+   "sku": "RB-TEC-028",
+   "name": "Vista 4K actiecamera",
+   "category": "Tech",
+   "price": 99,
+   "compare": null,
+   "cost": 34,
+   "image": "",
+   "icon": "camera",
+   "hue": 192,
+   "supplier": "CJdropshipping",
+   "supplierUrl": "",
+   "cjVid": "",
+   "cjFrom": "CN",
+   "cjLogistic": "",
+   "warehouse": "China",
+   "days": [
+    7,
+    12
+   ],
+   "stock": 380,
+   "rating": 0,
+   "reviews": 0,
+   "sold": 0,
+   "status": "active",
+   "description": "Leg elk avontuur vast in haarscherpe 4K. Beeldstabilisatie, waterdicht tot 30 meter en een uitgebreide accessoireset.",
+   "features": [
+    "4K/60fps video",
+    "Elektronische beeldstabilisatie",
+    "Waterdicht tot 30 m",
+    "20+ accessoires"
+   ]
+  }
+ ]
+}

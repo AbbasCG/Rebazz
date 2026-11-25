@@ -1,0 +1,7 @@
+User-agent: *
+Disallow: /beheer
+Disallow: /checkout
+Disallow: /bedankt
+Disallow: /api/
+
+Sitemap: https://rebazz.nl/sitemap.xml

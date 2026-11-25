@@ -1,0 +1,15 @@
+.claude/
+*.csv
+Thumbs.db
+.DS_Store
+frontend/node_modules
+frontend/dist
+lily-loves-dogs/
+.env
+.env.*
+!.env.example
+!.env.production.example
+!.env.share
+*.log
+*.sqlite
+graphify-out/
