@@ -147,6 +147,20 @@ class AdminApiTest extends TestCase
         $this->assertSame('Niet geschikt voor kinderen onder 3 jaar.', $pub['safetyInfo']);
     }
 
+    public function test_cached_catalog_is_refreshed_immediately_after_a_product_change(): void
+    {
+        $h = $this->auth();
+        $before = collect($this->getJson('/api/catalog')->json('products'))->first();
+        $p = $this->getJson('/api/admin/products', $h)->json('products.0');
+        $this->assertSame($p['id'], $before['id']);
+        $p['price'] = 77.77;
+        $p['compare'] = null;
+        $this->putJson('/api/admin/products/'.$p['id'], $p, $h)->assertOk();
+
+        $after = collect($this->getJson('/api/catalog')->json('products'))->firstWhere('id', $p['id']);
+        $this->assertEquals(77.77, $after['price']); // geen verouderde prijs uit de cache
+    }
+
     public function test_negative_stock_is_rejected(): void
     {
         $h = $this->auth();

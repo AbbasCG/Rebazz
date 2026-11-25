@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Cache;
 
 class Product extends Model
 {
@@ -14,6 +15,14 @@ class Product extends Model
         'cj_vid', 'cj_from', 'cj_logistic', 'warehouse', 'days_min', 'days_max', 'stock', 'rating', 'reviews_count', 'status',
         'description', 'features', 'manufacturer', 'eu_responsible', 'safety_info',
     ];
+
+    protected static function booted(): void
+    {
+        // De openbare catalogus wordt even gecachet; elke wijziging maakt de cache meteen ongeldig.
+        $forget = fn () => Cache::forget('shop.catalog');
+        static::saved($forget);
+        static::deleted($forget);
+    }
 
     protected function casts(): array
     {

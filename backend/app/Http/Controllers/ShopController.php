@@ -12,6 +12,7 @@ use App\Services\Pricing;
 use App\Services\StripeGateway;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\RateLimiter;
@@ -27,13 +28,15 @@ class ShopController extends Controller
 
     public function catalog(): JsonResponse
     {
-        return response()->json([
+        $payload = Cache::remember('shop.catalog', 60, fn () => [
             'brand' => Setting::brand(),
             'currency' => config('shop.currency'),
             'zones' => config('shop.zones'),
             'reviews' => Setting::get('reviews', []),
-            'products' => Product::active()->orderBy('created_at')->orderBy('id')->get()->map->toApi()->values(),
+            'products' => Product::active()->orderBy('created_at')->orderBy('id')->get()->map->toApi()->values()->all(),
         ]);
+
+        return response()->json($payload);
     }
 
     public function checkout(Request $request, Pricing $pricing, StripeGateway $stripe): JsonResponse
