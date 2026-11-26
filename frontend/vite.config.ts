@@ -26,7 +26,19 @@ export default defineConfig(({ command, mode }) => {
     },
     build: {
       outDir: '../backend/public/app',
-      emptyOutDir: true
+      emptyOutDir: true,
+      rolldownOptions: {
+        output: {
+          // Bibliotheken in eigen bestanden: de browser cachet ze apart en ze veranderen zelden bij een winkelupdate.
+          codeSplitting: {
+            groups: [
+              { name: 'vendor-react', test: /node_modules[\\/](react|react-dom|react-router|react-router-dom|scheduler)[\\/]/ },
+              { name: 'vendor-motion', test: /node_modules[\\/](motion|motion-dom|motion-utils|framer-motion)[\\/]/ },
+              { name: 'vendor-gsap', test: /node_modules[\\/](gsap|@gsap)[\\/]/ }
+            ]
+          }
+        }
+      }
     }
   };
 });
