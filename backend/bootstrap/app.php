@@ -13,6 +13,8 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
+        // Achter nginx/Cloudflare/load balancer: vertrouw die proxy zodat IP's, https en HSTS kloppen (TRUSTED_PROXIES=* of lijst).
+        $middleware->trustProxies(at: env('TRUSTED_PROXIES') ? (env('TRUSTED_PROXIES') === '*' ? '*' : array_map('trim', explode(',', env('TRUSTED_PROXIES')))) : null);
         $middleware->append(\App\Http\Middleware\SecurityHeaders::class);
         $middleware->alias([
             'abilities' => \Laravel\Sanctum\Http\Middleware\CheckAbilities::class,

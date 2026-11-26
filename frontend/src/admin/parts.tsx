@@ -32,7 +32,7 @@ export function Kpi({ label, value, format, delta, icon, good = true }: { label:
 
 export function StatusBadge({ o }: { o: Order }) {
   if (o.refunded) return <span className="badge danger">Terugbetaald</span>;
-  if (o.step === 0 && (o.cjStatus === 'error' || o.cjStatus === 'manual')) return <span className="badge danger">Actie nodig</span>;
+  if (o.step === 0 && (o.cjStatus === 'error' || o.cjStatus === 'manual' || o.cjStatus === 'placing')) return <span className="badge danger">Actie nodig</span>;
   if (o.delayed && o.step < 4) return <span className="badge warn">Vertraagd</span>;
   const map = ['accent', 'info', 'info', 'info', 'success'];
   const labels = ['Te verwerken', 'Bij leverancier', 'Verzonden', 'Onderweg', 'Afgeleverd'];

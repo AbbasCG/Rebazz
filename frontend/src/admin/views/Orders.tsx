@@ -13,7 +13,7 @@ const FILTERS: [string, string, (o: Order) => boolean][] = [
   ['supplier', 'Bij leverancier', o => o.step === 1 && !o.refunded],
   ['transit', 'Onderweg', o => (o.step === 2 || o.step === 3) && !o.refunded],
   ['delivered', 'Afgeleverd', o => o.step === 4 && !o.refunded],
-  ['attention', 'Actie nodig', o => !o.refunded && (o.cjStatus === 'error' || o.cjStatus === 'manual' || (o.delayed && o.step < 4))],
+  ['attention', 'Actie nodig', o => !o.refunded && (o.cjStatus === 'error' || o.cjStatus === 'manual' || o.cjStatus === 'placing' || (o.delayed && o.step < 4))],
   ['refunded', 'Terugbetaald', o => o.refunded]
 ];
 const CARRIERS = ['PostNL', 'DHL', 'DPD', 'GLS', 'UPS', 'FedEx', 'USPS', 'Royal Mail', 'YunExpress', '4PX', 'Cainiao', 'Anders'];
@@ -116,7 +116,7 @@ function OrderDetail({ o, onClose }: { o: Order; onClose: () => void }) {
 
   const cjLabel: Record<string, [string, string]> = {
     paid: ['success', 'Automatisch besteld en betaald bij CJ'], created: ['info', 'Aangemaakt bij CJ — betaal de bestelling in uw CJ-account'],
-    error: ['danger', 'Automatisch bestellen mislukt'], manual: ['warn', 'Niet automatisch besteld']
+    placing: ['warn', 'Wordt besteld (blijft dit hangen? Controleer CJ)'], error: ['danger', 'Automatisch bestellen mislukt'], manual: ['warn', 'Niet automatisch besteld']
   };
   const cj = cjLabel[o.cjStatus] ?? ['plain', status.cj ? 'Wacht op automatische verwerking' : 'CJ-koppeling niet ingesteld'];
 

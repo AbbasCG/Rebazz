@@ -161,6 +161,17 @@ class AdminApiTest extends TestCase
         $this->assertEquals(77.77, $after['price']); // geen verouderde prijs uit de cache
     }
 
+    public function test_admin_cannot_reorder_while_placing_and_brand_email_is_validated(): void
+    {
+        $h = $this->auth();
+        $o = $this->makeOrder('RB-PL', 'NL', 100.0, '2026-03-05 10:00:00');
+        $o->forceFill(['cj_status' => 'placing'])->save();
+        $this->postJson('/api/admin/orders/RB-PL/cj-order', [], $h)->assertStatus(409);
+
+        $this->putJson('/api/admin/settings/brand', ['value' => ['email' => 'geen-adres']], $h)->assertStatus(422);
+        $this->putJson('/api/admin/settings/brand', ['value' => ['email' => 'info@rebazz.nl', 'name' => ['x']]], $h)->assertOk();
+    }
+
     public function test_negative_stock_is_rejected(): void
     {
         $h = $this->auth();

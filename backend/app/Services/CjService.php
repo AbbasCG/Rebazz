@@ -75,17 +75,33 @@ class CjService
     /** Plaatst een betaalde bestelling bij CJ. Dubbel bestellen wordt voorkomen. */
     public function placeOrder(Order $order): Order
     {
-        if ($order->cj_order_ids) {
-            return $order;
+        if ($order->cj_order_ids || $order->status !== 'paid') {
+            return $order; // alleen betaalde (niet terugbetaalde) bestellingen worden besteld
         }
         // Atomische claim: slechts één proces (webhook, bedankpagina of beheerder) mag bij CJ bestellen.
         $claimed = Order::whereKey($order->getKey())
+            ->where('status', 'paid')
             ->where('cj_status', '')
             ->where(fn ($q) => $q->whereNull('cj_order_ids')->orWhere('cj_order_ids', ''))
             ->update(['cj_status' => 'placing']);
         if ($claimed === 0) {
             return $order->fresh('items') ?? $order;
         }
+
+        try {
+            return $this->placeClaimed($order);
+        } catch (Throwable $e) {
+            // Wat er ook misgaat na de claim: nooit in 'placing' blijven hangen.
+            Log::error('CJ bestellen onverwacht mislukt', ['order' => $order->order_no, 'error' => $e->getMessage()]);
+            $order->update(['cj_status' => 'error', 'cj_error' => mb_substr('Onverwachte fout: '.$e->getMessage(), 0, 450)]);
+            $this->alertOwner($order, 'Onverwachte fout: '.$e->getMessage());
+
+            return $order->fresh('items');
+        }
+    }
+
+    private function placeClaimed(Order $order): Order
+    {
         $order->refresh();
         $order->loadMissing('items');
         $lines = $order->items->map(fn ($i) => ['product' => Product::find($i->product_id), 'qty' => $i->qty])->all();
@@ -99,8 +115,10 @@ class CjService
         }
 
         $floor = round((float) $order->cost * (1 + max(0, (float) config('shop.min_margin_percent')) / 100), 2);
-        if ((float) $order->cost > 0 && (float) $order->total < $floor) {
-            $reason = sprintf('Margebewaking: ontvangen €%.2f is lager dan minimaal €%.2f (inkoop €%.2f, korting €%.2f). Controleer de kortingscode en bestel zelf indien gewenst.', $order->total, $floor, $order->cost, $order->discount);
+        // Vergelijk exclusief btw als Stripe Tax de werkelijke btw kent (btw is geen opbrengst).
+        $received = (float) $order->total - (float) ($order->tax_amount ?? 0);
+        if ((float) $order->cost > 0 && $received < $floor) {
+            $reason = sprintf('Margebewaking: ontvangen €%.2f (excl. btw) is lager dan minimaal €%.2f (inkoop €%.2f, korting €%.2f). Controleer de kortingscode en bestel zelf indien gewenst.', $received, $floor, $order->cost, $order->discount);
             $order->update(['cj_status' => 'manual', 'cj_error' => mb_substr($reason, 0, 450)]);
             $this->alertOwner($order, $reason);
 
@@ -140,7 +158,11 @@ class CjService
                     $body['iossType'] = 3; // CJ IOSS: btw vooraf afgedragen
                 }
                 $res = $this->call('POST', '/shopping/order/createOrderV2', $body);
-                $ids[] = $res['orderId'] ?? $res['shipmentOrderId'] ?? null;
+                $newId = $res['orderId'] ?? $res['shipmentOrderId'] ?? null;
+                if (! $newId) {
+                    throw new RuntimeException('CJ gaf geen order-ID terug; controleer het CJ-dashboard voordat u opnieuw bestelt.');
+                }
+                $ids[] = $newId;
                 // Direct vastleggen: mislukt een latere groep, dan is deze al bij CJ aangemaakt en mag niet dubbel besteld worden.
                 $order->update(['cj_order_ids' => implode(',', array_filter($ids))]);
             }
@@ -162,7 +184,7 @@ class CjService
     public function alertOwner(Order $order, string $reason): void
     {
         Log::error('CJ-bestelling vereist aandacht', ['order' => $order->order_no, 'reason' => $reason]);
-        $to = config('shop.brand.email') ?: env('OWNER_ALERT_EMAIL');
+        $to = config('shop.owner_alert_email') ?: (\App\Models\Setting::brand()['email'] ?? null);
         if (! $to) {
             return;
         }

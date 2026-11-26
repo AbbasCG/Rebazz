@@ -29,3 +29,24 @@ Artisan::command('shop:import-stripe', function (StripeGateway $stripe, OrderRec
 
 Schedule::command('shop:cj-sync')->everyTwoHours()->withoutOverlapping();
 Schedule::command('sanctum:prune-expired --hours=24')->daily();
+
+/* Betaalde bestellingen die blijven hangen (proces gestopt midden in het bestellen, of nooit gestart): eigenaar waarschuwen. */
+Artisan::command('shop:check-stuck', function (CjService $cj) {
+    if (! $cj->enabled()) {
+        return;
+    }
+    $cutoff = now()->subMinutes(15);
+    $stuck = Order::where('status', 'paid')
+        ->where(fn ($q) => $q->whereNull('cj_order_ids')->orWhere('cj_order_ids', ''))
+        ->where(fn ($q) => $q->where(fn ($p) => $p->where('cj_status', 'placing')->where('updated_at', '<', $cutoff))
+            ->orWhere(fn ($p) => $p->where('cj_status', '')->where('paid_at', '<', $cutoff)))
+        ->get();
+    foreach ($stuck as $o) {
+        if (Illuminate\Support\Facades\Cache::add('stuck-alert.'.$o->id, 1, now()->addDay())) { // één melding per dag per bestelling
+            $cj->alertOwner($o, 'Bestelling hangt vast (status "'.($o->cj_status ?: 'niet gestart').'"). Controleer het CJ-dashboard voordat u opnieuw bestelt.');
+        }
+    }
+    $this->info('Vastgelopen bestellingen: '.$stuck->count());
+})->purpose('Waarschuw bij betaalde bestellingen die niet bij CJ zijn geplaatst');
+
+Schedule::command('shop:check-stuck')->everyTenMinutes()->withoutOverlapping();

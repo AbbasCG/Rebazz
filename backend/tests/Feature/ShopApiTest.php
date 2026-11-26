@@ -232,6 +232,55 @@ class ShopApiTest extends TestCase
         $this->assertFalse($this->stripe->lastParams['allow_promotion_codes']);
     }
 
+    public function test_refunded_orders_are_never_placed_at_cj(): void
+    {
+        config(['shop.cj.api_key' => 'CJ@api@key']);
+        Product::whereKey('p1')->update(['cj_vid' => 'VID-AURA', 'cj_from' => 'PL']);
+        Http::fake();
+        $this->stripe->session = $this->paidSession(['payment_intent' => ['latest_charge' => ['refunded' => true]]]);
+        $this->getJson('/api/orders/confirm?session_id=cs_test_abc123')->assertOk();
+
+        $o = Order::first();
+        $this->assertSame('refunded', $o->status);
+        $this->assertSame('', $o->cj_status);
+        Http::assertNothingSent();
+        app(\App\Services\CjService::class)->placeOrder($o);
+        Http::assertNothingSent();
+    }
+
+    public function test_cj_response_without_order_id_is_treated_as_failure(): void
+    {
+        config(['shop.cj.api_key' => 'CJ@api@key']);
+        Product::whereKey('p1')->update(['cj_vid' => 'VID-AURA', 'cj_from' => 'PL']);
+        Http::fake([
+            '*/authentication/getAccessToken' => Http::response(['code' => 200, 'result' => true, 'data' => ['accessToken' => 'TOK']]),
+            '*/logistic/freightCalculate' => Http::response(['code' => 200, 'result' => true, 'data' => [['logisticName' => 'CJPacket', 'logisticPrice' => '4']]]),
+            '*/shopping/order/createOrderV2' => Http::response(['code' => 200, 'result' => true, 'data' => []]),
+        ]);
+        $this->stripe->session = $this->paidSession();
+        $this->getJson('/api/orders/confirm?session_id=cs_test_abc123')->assertOk();
+
+        $o = Order::first();
+        $this->assertSame('error', $o->cj_status);
+        $this->assertSame('', (string) $o->cj_order_ids);
+        $this->assertStringContainsString('geen order-ID', $o->cj_error);
+    }
+
+    public function test_stuck_orders_command_alerts_once_and_ignores_fresh_ones(): void
+    {
+        config(['shop.cj.api_key' => 'CJ@api@key', 'mail.default' => 'array']);
+        $this->stripe->session = $this->paidSession();
+        Http::fake(['*' => Http::response([], 500)]);
+        $this->getJson('/api/orders/confirm?session_id=cs_test_abc123');
+        $o = Order::first();
+        $o->forceFill(['cj_status' => 'placing', 'cj_order_ids' => ''])->save();
+
+        $this->artisan('shop:check-stuck')->expectsOutput('Vastgelopen bestellingen: 0')->assertExitCode(0); // net bijgewerkt
+
+        $o->forceFill(['updated_at' => now()->subMinutes(30)])->saveQuietly();
+        $this->artisan('shop:check-stuck')->expectsOutput('Vastgelopen bestellingen: 1')->assertExitCode(0);
+    }
+
     public function test_partial_cj_failure_keeps_first_order_id_and_flags_error(): void
     {
         config(['shop.cj.api_key' => 'CJ@api@key']);

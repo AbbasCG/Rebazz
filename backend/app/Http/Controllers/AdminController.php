@@ -109,6 +109,13 @@ class AdminController extends Controller
                     if ($order->cj_order_ids) {
                         return response()->json(['message' => 'Deze bestelling staat al bij CJ.'], 409);
                     }
+                    if ($order->cj_status === 'placing' && $order->updated_at?->gt(now()->subMinutes(15))) {
+                        return response()->json(['message' => 'Deze bestelling wordt op dit moment bij CJ geplaatst. Wacht enkele minuten.'], 409);
+                    }
+                    if ($order->status !== 'paid') {
+                        return response()->json(['message' => 'Alleen betaalde bestellingen kunnen bij CJ worden geplaatst.'], 409);
+                    }
+                    // Let op: controleer eerst het CJ-dashboard of de bestelling daar al bestaat (bijv. na een afgebroken poging).
                     $order->update(['cj_status' => '', 'cj_error' => '']);
                     $cj->placeOrder($order);
                     break;
@@ -226,8 +233,11 @@ class AdminController extends Controller
             return response()->json(['message' => 'Te veel gegevens.'], 422);
         }
         if ($key === 'brand') {
-            $value = array_intersect_key((array) $value, config('shop.brand'));
+            $value = array_filter(array_intersect_key((array) $value, config('shop.brand')), 'is_scalar');
             $value = array_map(fn ($v) => mb_substr(trim((string) $v), 0, 300), $value);
+            if (isset($value['email']) && filter_var($value['email'], FILTER_VALIDATE_EMAIL) === false) {
+                return response()->json(['message' => 'Ongeldig e-mailadres.'], 422);
+            }
         }
         Setting::put($key, $value);
 

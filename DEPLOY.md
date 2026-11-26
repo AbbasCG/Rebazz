@@ -14,13 +14,21 @@ composer install --no-dev --optimize-autoloader
 cp .env.production.example .env      # vul alle lege waarden in
 php artisan key:generate
 php artisan migrate --force
-php artisan config:cache && php artisan route:cache
-cd ../frontend && npm ci && npm run build   # bouwt naar backend/public/app
+# Webserver-gebruiker moet kunnen schrijven in storage/ en bootstrap/cache/
+php artisan config:cache && php artisan route:cache && php artisan event:cache && php artisan view:cache
+cd ../frontend && npm ci && npm run build   # bouwt naar backend/public/app (Node nodig op de buildmachine; public/app staat niet in git)
 ```
 
+**Startproducten:** `php artisan db:seed --force` zet de 10 voorbeeldproducten uit de vorige versie in de database
+(zonder beoordelingen, zonder CJ-variant-ID). Doe dit **alleen** als u die producten echt wilt verkopen; vul dan eerst per product
+GPSR-gegevens en CJ-variant-ID in via het beheer (`/beheer`) voordat u ze activeert. Anders begint u met een lege winkel en voegt u eigen producten toe.
+
 ## 3. Taken op de server
-- Cron: `* * * * * cd /pad/backend && php artisan schedule:run >> /dev/null 2>&1`
-- Queue-worker onder supervisor/systemd: `php artisan queue:work --tries=3`
+- Cron (verplicht, ook voor de CJ-synchronisatie en de melding bij vastgelopen bestellingen):
+  `* * * * * cd /pad/backend && php artisan schedule:run >> /dev/null 2>&1`
+- Een queue-worker is **niet** nodig (`QUEUE_CONNECTION=sync`; er worden geen jobs in een wachtrij gezet).
+- Achter een proxy/Cloudflare: zet `TRUSTED_PROXIES` in `.env`, anders ziet de app alleen het proxy-IP (gedeelde limieten, geen HSTS).
+- Houd `OWNER_ALERT_EMAIL` actueel: daar komen meldingen binnen over mislukte of vastgelopen CJ-bestellingen, terugbetalingen en betwistingen.
 
 ## 4. Stripe
 - Webhook-endpoint: `https://<domein>/api/stripe/webhook` met de events:

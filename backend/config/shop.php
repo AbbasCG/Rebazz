@@ -32,6 +32,9 @@ return [
     // GPSR: als 'on' kan een product alleen actief worden met fabrikant en EU-verantwoordelijke.
     'require_gpsr' => env('SHOP_REQUIRE_GPSR', 'off') === 'on',
 
+    // Waarschuwingen (mislukte CJ-bestelling, terugbetaling, betwisting) gaan hierheen; leeg = het e-mailadres uit de bedrijfsgegevens.
+    'owner_alert_email' => env('OWNER_ALERT_EMAIL'),
+
     'currency' => 'eur',
 
     // Standaard bedrijfsgegevens; aanpasbaar in het dashboard (opgeslagen in de tabel settings).
