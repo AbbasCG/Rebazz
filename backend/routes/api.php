@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\AdminController;
+use App\Http\Controllers\DocumentController;
 use App\Http\Controllers\ShopController;
 use Illuminate\Support\Facades\Route;
 
@@ -12,6 +13,9 @@ Route::post('/orders/track', [ShopController::class, 'track'])->middleware('thro
 Route::post('/withdrawal', [ShopController::class, 'withdrawal'])->middleware('throttle:5,10');
 Route::get('/newsletter/confirm', [ShopController::class, 'confirmNewsletter'])->middleware('throttle:30,1');
 Route::post('/newsletter', [ShopController::class, 'newsletter'])->middleware('throttle:5,1');
+// Factuur en creditnota voor de klant via een ondertekende link (uit de bevestigingsmail); niet te raden zonder APP_KEY.
+Route::get('/orders/{order}/invoice', [DocumentController::class, 'invoice'])->middleware(['signed', 'throttle:30,1'])->name('orders.invoice');
+Route::get('/orders/{order}/credit-note', [DocumentController::class, 'creditNote'])->middleware(['signed', 'throttle:30,1'])->name('orders.credit-note');
 Route::post('/stripe/webhook', [ShopController::class, 'stripeWebhook'])->middleware('throttle:240,1');
 
 /* ---------- Beheer ---------- */
@@ -22,6 +26,8 @@ Route::prefix('admin')->middleware(['auth:sanctum', 'abilities:admin'])->group(f
     Route::get('/status', [AdminController::class, 'status']);
     Route::get('/orders', [AdminController::class, 'orders']);
     Route::patch('/orders/{order}', [AdminController::class, 'updateOrder']);
+    Route::get('/orders/{order}/invoice', [DocumentController::class, 'invoice']);
+    Route::get('/orders/{order}/credit-note', [DocumentController::class, 'creditNote']);
     Route::post('/orders/{order}/{action}', [AdminController::class, 'orderAction'])->whereIn('action', ['refund', 'notify', 'cj-order', 'cj-check']);
     Route::post('/cj-sync', [AdminController::class, 'cjSync']);
     Route::get('/products', [AdminController::class, 'products']);

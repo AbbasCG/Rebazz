@@ -96,6 +96,7 @@ class DemoSeeder extends Seeder
                 'cj_error' => $x['cj_error'] ?? '',
                 'cj_wait' => $x['cj_wait'] ?? false,
                 'paid_at' => $paidAt,
+                'confirmation_sent_at' => $paidAt, // demo-bestellingen krijgen nooit een echte orderbevestiging
             ]);
             $order->items()->delete();
             foreach ($lines as [$p, $qty]) {

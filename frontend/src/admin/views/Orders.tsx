@@ -98,6 +98,15 @@ function OrderDetail({ o, onClose }: { o: Order; onClose: () => void }) {
     } catch (e) { toast('Opslaan mislukt: ' + (e as Error).message, 'error'); }
     setBusy(false);
   };
+  const openDoc = async (kind: 'invoice' | 'credit-note') => {
+    try {
+      const url = URL.createObjectURL(await api.admin.document(o.id, kind));
+      const a = document.createElement('a');
+      a.href = url; a.download = (kind === 'invoice' ? 'factuur-' : 'creditnota-') + o.id + '.pdf';
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 10000);
+    } catch (e) { toast('Document openen mislukt: ' + (e as Error).message, 'error'); }
+  };
   const action = async (a: 'refund' | 'notify' | 'cj-order' | 'cj-check', msg: string) => {
     setBusy(true);
     try { const r = await api.admin.orderAction(o.id, a); replaceOrder(r.order); toast(a === 'notify' && !r.mailed ? 'E-mail is nog niet ingesteld (zie HANDLEIDING.md)' : msg); }
@@ -167,6 +176,13 @@ function OrderDetail({ o, onClose }: { o: Order; onClose: () => void }) {
           <span>Inkoop</span><span style={{ color: 'var(--ink)' }}>{eur(o.cost)}</span>
           <span>Transactiekosten (ca.)</span><span style={{ color: 'var(--ink)' }}>{eur(fee(o.total))}</span>
           <span>Winst (ca.)</span><b className={profit(o) >= 0 ? 'up' : 'down'}>{eur(profit(o))}</b>
+        </div>
+        <div>
+          <div className="section-label">Documenten</div>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            <button className="btn btn-outline btn-sm" onClick={() => openDoc('invoice')}><Icon name="external" size={14} />Factuur (PDF)</button>
+            {o.refunded && <button className="btn btn-outline btn-sm" onClick={() => openDoc('credit-note')}><Icon name="external" size={14} />Creditnota (PDF)</button>}
+          </div>
         </div>
         {!o.refunded && o.step >= 1 && o.step < 4 && (
           <div>

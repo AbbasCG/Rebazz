@@ -9,6 +9,7 @@ use App\Models\Product;
 use App\Models\Setting;
 use App\Models\User;
 use App\Services\CjService;
+use App\Services\InvoiceService;
 use App\Services\StripeGateway;
 use App\Services\TaxService;
 use Illuminate\Http\JsonResponse;
@@ -104,6 +105,7 @@ class AdminController extends Controller
                     }
                     $stripe->refund($order->payment_intent_id);
                     $order->update(['status' => 'refunded', 'cj_wait' => false]);
+                    app(InvoiceService::class)->ensureCreditNote($order);
                     break;
                 case 'cj-order':
                     if ($order->cj_order_ids) {

@@ -50,3 +50,18 @@ Artisan::command('shop:check-stuck', function (CjService $cj) {
 })->purpose('Waarschuw bij betaalde bestellingen die niet bij CJ zijn geplaatst');
 
 Schedule::command('shop:check-stuck')->everyTenMinutes()->withoutOverlapping();
+
+/* Orderbevestigingen die niet verstuurd zijn (bijv. mailserver even uit): opnieuw proberen voor betalingen van de laatste 48 uur. */
+Artisan::command('shop:send-confirmations', function () {
+    $sent = 0;
+    Order::where('status', 'paid')->whereNull('confirmation_sent_at')
+        ->where('paid_at', '>', now()->subHours(48))->where('paid_at', '<', now()->subMinutes(2))
+        ->each(function ($o) use (&$sent) {
+            if (\App\Mail\OrderConfirmationMail::sendFor($o)) {
+                $sent++;
+            }
+        });
+    $this->info('Bevestigingen verstuurd: '.$sent);
+})->purpose('Verstuur ontbrekende orderbevestigingen (laatste 48 uur)');
+
+Schedule::command('shop:send-confirmations')->everyTenMinutes()->withoutOverlapping();

@@ -281,6 +281,94 @@ class ShopApiTest extends TestCase
         $this->assertSame('NIEUW', \Illuminate\Support\Facades\Cache::get('cj.token'));
     }
 
+    private function webhookPaid(string $sessionId = 'cs_test_abc123'): void
+    {
+        $this->call('POST', '/api/stripe/webhook', [], [], [], ['HTTP_STRIPE_SIGNATURE' => 'ok', 'CONTENT_TYPE' => 'application/json'],
+            json_encode(['type' => 'checkout.session.completed', 'data' => ['object' => ['id' => $sessionId]]]))->assertOk();
+    }
+
+    public function test_every_paid_order_gets_a_unique_sequential_invoice_number_exactly_once(): void
+    {
+        \Illuminate\Support\Facades\Mail::fake();
+        $year = now()->format('Y');
+        $this->stripe->session = $this->paidSession(['created' => now()->timestamp]);
+        $this->webhookPaid();
+        $this->webhookPaid(); // zelfde sessie nog eens: geen tweede nummer
+        $this->stripe->session = $this->paidSession(['id' => 'cs_test_second', 'created' => now()->timestamp, 'metadata' => ['order_no' => 'RB-TEST02']]);
+        $this->webhookPaid('cs_test_second');
+
+        $this->assertSame(2, Order::count());
+        $this->assertSame("RBF-$year-00001", Order::where('order_no', 'RB-TEST01')->value('invoice_number'));
+        $this->assertSame("RBF-$year-00002", Order::where('order_no', 'RB-TEST02')->value('invoice_number'));
+    }
+
+    public function test_order_confirmation_is_mailed_once_in_the_customers_language_with_invoice_attached(): void
+    {
+        \Illuminate\Support\Facades\Mail::fake();
+        $this->stripe->session = $this->paidSession();
+        $this->webhookPaid();
+        $this->webhookPaid(); // Stripe stuurt het event soms dubbel
+        $this->getJson('/api/orders/confirm?session_id=cs_test_abc123')->assertOk(); // en de bedankpagina ook
+
+        \Illuminate\Support\Facades\Mail::assertSent(\App\Mail\OrderConfirmationMail::class, 1);
+        \Illuminate\Support\Facades\Mail::assertSent(\App\Mail\OrderConfirmationMail::class, function ($m) {
+            $att = $m->attachments();
+
+            return $m->hasTo('anna@example.de')
+                && str_contains($m->envelope()->subject, 'Bestätigung Ihrer Bestellung RB-TEST01') // lang=de
+                && count($att) === 1
+                && str_starts_with($att[0]->as, 'factuur-rbf-');
+        });
+        $this->assertNotNull(Order::first()->confirmation_sent_at);
+    }
+
+    public function test_confirmation_flag_is_reset_when_mailing_fails_so_it_can_be_retried(): void
+    {
+        $this->stripe->session = $this->paidSession(['created' => now()->subMinutes(10)->timestamp]);
+        // Mailserver "down": een SMTP-verbinding naar een poort waar niets luistert.
+        config(['mail.mailers.broken' => ['transport' => 'smtp', 'host' => '127.0.0.1', 'port' => 1, 'timeout' => 2], 'mail.default' => 'broken']);
+        $this->webhookPaid();
+        $this->assertNull(Order::first()->confirmation_sent_at); // markering teruggezet
+
+        config(['mail.default' => 'array']); // mailserver is weer bereikbaar
+        $this->artisan('shop:send-confirmations')->expectsOutput('Bevestigingen verstuurd: 1')->assertExitCode(0);
+        $this->assertNotNull(Order::first()->confirmation_sent_at);
+    }
+
+    public function test_customer_can_download_invoice_only_through_a_valid_signed_link(): void
+    {
+        \Illuminate\Support\Facades\Mail::fake();
+        $this->stripe->session = $this->paidSession();
+        $this->webhookPaid();
+        $order = Order::first();
+        $url = app(\App\Services\InvoiceService::class)->signedUrl($order);
+
+        $res = $this->get($url)->assertOk();
+        $this->assertSame('application/pdf', $res->headers->get('Content-Type'));
+        $this->assertStringStartsWith('%PDF', $res->getContent());
+
+        $this->get('/api/orders/RB-TEST01/invoice')->assertForbidden();                          // zonder handtekening
+        Order::create(['order_no' => 'RB-TEST02', 'stripe_session_id' => 'cs_other', 'status' => 'paid', 'country' => 'NL', 'total' => 10]);
+        $this->get(str_replace('RB-TEST01', 'RB-TEST02', $url))->assertForbidden();              // handtekening past niet bij ander bestelnummer
+        $this->get($url.'x')->assertForbidden();                                                  // gemanipuleerde handtekening
+        $this->get(app(\App\Services\InvoiceService::class)->signedUrl($order, 'credit'))->assertNotFound(); // geen creditnota zonder terugbetaling
+    }
+
+    public function test_refund_webhook_issues_a_credit_note_that_can_be_downloaded(): void
+    {
+        \Illuminate\Support\Facades\Mail::fake();
+        $this->stripe->session = $this->paidSession();
+        $this->webhookPaid();
+        $this->call('POST', '/api/stripe/webhook', [], [], [], ['HTTP_STRIPE_SIGNATURE' => 'ok', 'CONTENT_TYPE' => 'application/json'],
+            json_encode(['type' => 'charge.refunded', 'data' => ['object' => ['payment_intent' => 'pi_123', 'refunded' => true]]]))->assertOk();
+
+        $order = Order::first();
+        $this->assertSame('refunded', $order->status);
+        $this->assertStringStartsWith('RBC-'.now()->format('Y').'-', $order->credit_note_number);
+        $res = $this->get(app(\App\Services\InvoiceService::class)->signedUrl($order, 'credit'))->assertOk();
+        $this->assertStringStartsWith('%PDF', $res->getContent());
+    }
+
     public function test_refunded_orders_are_never_placed_at_cj(): void
     {
         config(['shop.cj.api_key' => 'CJ@api@key']);

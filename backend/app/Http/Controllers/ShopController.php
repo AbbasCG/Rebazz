@@ -6,7 +6,9 @@ use App\Models\NewsletterSubscriber;
 use App\Models\Order;
 use App\Models\Product;
 use App\Models\Setting;
+use App\Mail\OrderConfirmationMail;
 use App\Services\CjService;
+use App\Services\InvoiceService;
 use App\Services\OrderRecorder;
 use App\Services\Pricing;
 use App\Services\StripeGateway;
@@ -149,6 +151,9 @@ class ShopController extends Controller
                 return response()->json(['order_no' => $s['metadata']['order_no'] ?? '', 'paid' => false, 'total' => ($s['amount_total'] ?? 0) / 100, 'email' => '', 'country' => '']);
             }
             $order = $recorder->record($s);
+            if ($order) {
+                OrderConfirmationMail::sendFor($order);
+            }
             if ($order && $order->wasRecentlyCreated && $cj->enabled()) {
                 $cj->placeOrder($order);
             }
@@ -293,6 +298,9 @@ class ShopController extends Controller
         try {
             $session = $stripe->retrieveSession($event['data']['object']['id']);
             $order = $recorder->record($session);
+            if ($order) {
+                OrderConfirmationMail::sendFor($order); // éénmalig; mislukt het, dan probeert shop:send-confirmations het later
+            }
             if ($order && $cj->enabled() && ! $order->cj_order_ids && $order->cj_status === '') {
                 $cj->placeOrder($order);
             }
@@ -319,6 +327,7 @@ class ShopController extends Controller
             }
             if ($order->status !== 'refunded') {
                 $order->update(['status' => 'refunded', 'cj_wait' => false]);
+                app(InvoiceService::class)->ensureCreditNote($order);
                 if ($order->cj_order_ids) {
                     $cj->alertOwner($order, 'Bestelling is terugbetaald in Stripe maar staat al bij CJ ('.$order->cj_order_ids.'). Annuleer de CJ-bestelling indien mogelijk.');
                 }

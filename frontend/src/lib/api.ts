@@ -74,6 +74,12 @@ export const api = {
     orderAction: (id: string, action: 'refund' | 'notify' | 'cj-order' | 'cj-check') =>
       request<{ order: Order; mailed?: boolean }>('POST', '/admin/orders/' + encodeURIComponent(id) + '/' + action, {}, true),
     cjSync: () => request<{ checked: number; changed: number }>('POST', '/admin/cj-sync', {}, true),
+    /** Factuur of creditnota (PDF) van een bestelling. */
+    document: async (id: string, kind: 'invoice' | 'credit-note'): Promise<Blob> => {
+      const res = await fetch(BASE + '/api/admin/orders/' + encodeURIComponent(id) + '/' + kind, { headers: { Authorization: 'Bearer ' + adminToken.get(), Accept: 'application/pdf' } });
+      if (!res.ok) throw new ApiError('Document niet beschikbaar (' + res.status + ')', res.status, null);
+      return res.blob();
+    },
     products: () => request<{ products: Product[] }>('GET', '/admin/products', undefined, true),
     saveProduct: (p: Product, isNew: boolean) =>
       request<{ product: Product }>(isNew ? 'POST' : 'PUT', isNew ? '/admin/products' : '/admin/products/' + encodeURIComponent(p.id), p, true),

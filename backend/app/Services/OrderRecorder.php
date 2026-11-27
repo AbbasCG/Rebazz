@@ -71,6 +71,8 @@ class OrderRecorder
                 'ship_method' => $md['ship'] ?? 'standard',
                 'paid_at' => Carbon::createFromTimestamp($s['created'] ?? time()),
             ]);
+            // Factuurnummer in dezelfde transactie als de bestelling: komt de bestelling er niet, dan ontbreekt er ook geen nummer.
+            app(InvoiceService::class)->ensureInvoice($order);
             foreach ($items as $i) {
                 $p = $products->get($i['id']);
                 $order->items()->create([

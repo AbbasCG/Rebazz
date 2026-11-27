@@ -172,6 +172,27 @@ class AdminApiTest extends TestCase
         $this->putJson('/api/admin/settings/brand', ['value' => ['email' => 'info@rebazz.nl', 'name' => ['x']]], $h)->assertOk();
     }
 
+    public function test_admin_can_download_invoice_and_credit_note_and_old_orders_get_a_number_lazily(): void
+    {
+        $h = $this->auth();
+        $o = $this->makeOrder('RB-OLD', 'DE', 119.00, '2026-03-05 10:00:00');
+        $this->assertNull($o->invoice_number);
+
+        $this->getJson('/api/admin/orders/RB-OLD/invoice')->assertUnauthorized();
+        $res = $this->get('/api/admin/orders/RB-OLD/invoice', $h)->assertOk();
+        $this->assertStringStartsWith('%PDF', $res->getContent());
+        $this->assertStringStartsWith('RBF-2026-', $o->fresh()->invoice_number);
+        $first = $o->fresh()->invoice_number;
+        $this->get('/api/admin/orders/RB-OLD/invoice', $h)->assertOk();
+        $this->assertSame($first, $o->fresh()->invoice_number); // nummer verandert niet
+
+        $this->get('/api/admin/orders/RB-OLD/credit-note', $h)->assertNotFound(); // nog niet terugbetaald
+        $o->update(['payment_intent_id' => 'pi_RB-OLD']);
+        $this->postJson('/api/admin/orders/RB-OLD/refund', [], $h)->assertOk();
+        $this->assertStringStartsWith('RBC-', $o->fresh()->credit_note_number);
+        $this->assertStringStartsWith('%PDF', $this->get('/api/admin/orders/RB-OLD/credit-note', $h)->assertOk()->getContent());
+    }
+
     public function test_negative_stock_is_rejected(): void
     {
         $h = $this->auth();

@@ -9,9 +9,37 @@ use Illuminate\Support\Carbon;
 /** Btw-overzicht per kwartaal: Nederland, OSS (EU) en export. Indicatief, geen belastingadvies. */
 class TaxService
 {
-    public function summary(int $year, int $quarter): array
+    /**
+     * Btw van één bestelling: werkelijke btw van Stripe Tax als die bekend is, anders een schatting met vaste tarieven
+     * (NL 21%, EU-bestemmingsland bij OSS, buiten de EU 0%).
+     *
+     * @return array{o: Order, country: string, regime: string, rate: float, incl: float, excl: float, vat: float}
+     */
+    public function vatFor(Order $o, bool $oss = true): array
     {
         $rates = config('shop.vat_rates');
+        $c = $o->country;
+        if ($c === 'NL') {
+            [$regime, $rate] = ['nl', 21.0];
+        } elseif (isset($rates[$c]) && $oss) {
+            [$regime, $rate] = ['oss', (float) $rates[$c]];
+        } elseif (isset($rates[$c])) {
+            [$regime, $rate] = ['nl', 21.0];
+        } else {
+            [$regime, $rate] = ['export', 0.0];
+        }
+        if ($o->tax_amount !== null) {
+            $excl = $o->total - $o->tax_amount;
+            $rate = $excl > 0 ? round($o->tax_amount / $excl * 100, 2) : 0.0;
+        } else {
+            $excl = $o->total / (1 + $rate / 100);
+        }
+
+        return ['o' => $o, 'country' => $c, 'regime' => $regime, 'rate' => $rate, 'incl' => $o->total, 'excl' => $excl, 'vat' => $o->total - $excl];
+    }
+
+    public function summary(int $year, int $quarter): array
+    {
         $useOss = Setting::get('tax.oss', true) !== false;
         $periodKey = $year.'-'.($quarter ?: 'jaar');
         $inputVat = (float) Setting::get('tax.input.'.$periodKey, 0);
@@ -20,27 +48,7 @@ class TaxService
             ? [Carbon::create($year, ($quarter - 1) * 3 + 1, 1)->startOfDay(), Carbon::create($year, ($quarter - 1) * 3 + 1, 1)->addMonths(3)->startOfDay()]
             : [Carbon::create($year, 1, 1)->startOfDay(), Carbon::create($year + 1, 1, 1)->startOfDay()];
 
-        $lineFor = function (Order $o, bool $oss) use ($rates) {
-            $c = $o->country;
-            if ($c === 'NL') {
-                [$regime, $rate] = ['nl', 21.0];
-            } elseif (isset($rates[$c]) && $oss) {
-                [$regime, $rate] = ['oss', (float) $rates[$c]];
-            } elseif (isset($rates[$c])) {
-                [$regime, $rate] = ['nl', 21.0];
-            } else {
-                [$regime, $rate] = ['export', 0.0];
-            }
-            if ($o->tax_amount !== null) {
-                // Werkelijk door Stripe Tax berekende btw gebruiken in plaats van een schatting met vaste tarieven.
-                $excl = $o->total - $o->tax_amount;
-                $rate = $excl > 0 ? round($o->tax_amount / $excl * 100, 2) : 0.0;
-            } else {
-                $excl = $o->total / (1 + $rate / 100);
-            }
-
-            return ['o' => $o, 'country' => $c, 'regime' => $regime, 'rate' => $rate, 'incl' => $o->total, 'excl' => $excl, 'vat' => $o->total - $excl];
-        };
+        $lineFor = fn (Order $o, bool $oss) => $this->vatFor($o, $oss);
 
         $lines = Order::where('status', 'paid')->where('paid_at', '>=', $from)->where('paid_at', '<', $to)->orderBy('paid_at')->get()
             ->map(fn ($o) => $lineFor($o, $useOss));
