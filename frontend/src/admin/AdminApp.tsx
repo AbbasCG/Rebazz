@@ -11,6 +11,7 @@ import Ads from './views/Ads';
 import Automations from './views/Automations';
 import Checklist from './views/Checklist';
 import Orders from './views/Orders';
+import Returns from './views/Returns';
 import Overview from './views/Overview';
 import Products from './views/Products';
 import Research from './views/Research';
@@ -29,6 +30,7 @@ export const ROUTES = [
   ] },
   { group: 'Operatie', items: [
     { id: 'bestellingen', label: 'Bestellingen & verzending', icon: 'truck', sub: 'Verwerk, volg en controleer alle zendingen' },
+    { id: 'retouren', label: 'Retouren', icon: 'refresh', sub: 'Retouraanvragen beoordelen, ontvangen en terugbetalen' },
     { id: 'klantenservice', label: 'Klantenservice', icon: 'message', ai: true, sub: 'Meertalige inbox met AI-antwoordsuggesties' },
     { id: 'automatisering', label: 'Automatiseringen', icon: 'bot', sub: 'Terugkerende taken automatisch laten uitvoeren' }
   ] },
@@ -183,6 +185,7 @@ function Shell({ onLogout }: { onLogout: () => void }) {
               <Route path="studio" element={<Studio />} />
               <Route path="advertenties" element={<Ads />} />
               <Route path="bestellingen" element={<Orders />} />
+              <Route path="retouren" element={<Returns />} />
               <Route path="klantenservice" element={<Support />} />
               <Route path="automatisering" element={<Automations />} />
               <Route path="belasting" element={<Tax />} />

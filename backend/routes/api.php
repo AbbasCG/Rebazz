@@ -3,6 +3,7 @@
 use App\Http\Controllers\AdminController;
 use App\Http\Controllers\DocumentController;
 use App\Http\Controllers\MediaController;
+use App\Http\Controllers\ReturnController;
 use App\Http\Controllers\ShopController;
 use Illuminate\Support\Facades\Route;
 
@@ -11,6 +12,8 @@ Route::get('/catalog', [ShopController::class, 'catalog']);
 Route::post('/checkout', [ShopController::class, 'checkout'])->middleware('throttle:20,1');
 Route::get('/orders/confirm', [ShopController::class, 'confirm'])->middleware('throttle:30,1');
 Route::post('/orders/track', [ShopController::class, 'track'])->middleware('throttle:10,1');
+Route::post('/returns', [ReturnController::class, 'store'])->middleware('throttle:10,10');
+Route::get('/returns/{return}/credit-note', [DocumentController::class, 'returnCreditNote'])->middleware(['signed', 'throttle:30,1'])->name('returns.credit-note');
 Route::post('/withdrawal', [ShopController::class, 'withdrawal'])->middleware('throttle:5,10');
 Route::get('/newsletter/confirm', [ShopController::class, 'confirmNewsletter'])->middleware('throttle:30,1');
 Route::post('/newsletter', [ShopController::class, 'newsletter'])->middleware('throttle:5,1');
@@ -30,6 +33,9 @@ Route::prefix('admin')->middleware(['auth:sanctum', 'abilities:admin'])->group(f
     Route::patch('/orders/{order}', [AdminController::class, 'updateOrder']);
     Route::get('/orders/{order}/invoice', [DocumentController::class, 'invoice']);
     Route::get('/orders/{order}/credit-note', [DocumentController::class, 'creditNote']);
+    Route::get('/returns', [ReturnController::class, 'index']);
+    Route::get('/returns/{return}/credit-note', [DocumentController::class, 'returnCreditNote']);
+    Route::post('/returns/{return}/{action}', [ReturnController::class, 'action'])->whereIn('action', ['approve', 'reject', 'receive', 'refund']);
     Route::post('/orders/{order}/{action}', [AdminController::class, 'orderAction'])->whereIn('action', ['refund', 'notify', 'cj-order', 'cj-check']);
     Route::post('/cj-sync', [AdminController::class, 'cjSync']);
     Route::get('/products', [AdminController::class, 'products']);

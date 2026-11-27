@@ -9,7 +9,8 @@ import { CURRENCIES, useI18n } from '../lib/i18n';
 import { quote, zoneFor } from '../lib/quote';
 import { productPath } from '../lib/slug';
 import { deliveryWindow, useShop } from '../lib/shop';
-import type { Product } from '../lib/types';
+import type { Product, TrackedOrder } from '../lib/types';
+import { ReturnPanel } from './ReturnPanel';
 import { Icon, MButton, Overlay, ProductVisual, Stars, ThemeToggle, useToast } from './ui';
 
 interface ShopUI { openProduct: (p: Product) => void; openCart: () => void; openTrack: () => void; query: string; setQuery: (q: string) => void }
@@ -348,7 +349,7 @@ function TrackModal({ onClose }: { onClose: () => void }) {
   const [code, setCode] = useState('');
   const [email, setEmail] = useState('');
   const [state, setState] = useState<'idle' | 'loading' | 'none' | 'ok'>('idle');
-  const [order, setOrder] = useState<Awaited<ReturnType<typeof api.track>> | null>(null);
+  const [order, setOrder] = useState<TrackedOrder | null>(null);
   const submit = async (e: FormEvent) => {
     e.preventDefault();
     setState('loading');
@@ -382,6 +383,7 @@ function TrackModal({ onClose }: { onClose: () => void }) {
                   </motion.li>
                 ))}
               </ol>
+              <ReturnPanel order={order} code={code.trim()} email={email.trim()} onChange={patch => setOrder(o => (o ? { ...o, ...patch } : o))} />
             </>
           )}
         </div>

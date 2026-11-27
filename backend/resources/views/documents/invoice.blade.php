@@ -65,6 +65,9 @@
             <table class="meta">
                 <tr><td class="muted">{{ $credit ? 'Creditnotadatum' : 'Factuurdatum' }}</td><td class="r">{{ $date->timezone('Europe/Amsterdam')->format('d-m-Y') }}</td></tr>
                 <tr><td class="muted">Bestelnummer</td><td class="r">{{ $o->order_no }}</td></tr>
+                @if($credit && !empty($rma))
+                <tr><td class="muted">Retour</td><td class="r">{{ $rma }}</td></tr>
+                @endif
                 @if($credit)
                 <tr><td class="muted">Betreft factuur</td><td class="r">{{ $o->invoice_number }}</td></tr>
                 @endif
@@ -80,6 +83,16 @@
         <tr><th>Omschrijving</th><th class="r" style="width:8%">Aantal</th><th class="r" style="width:20%">Prijs incl. btw</th><th class="r" style="width:20%">Totaal incl. btw</th></tr>
     </thead>
     <tbody>
+    @if(!empty($lines))
+    @foreach($lines as $l)
+        <tr>
+            <td>{{ $l['name'] }}@if(!empty($l['sku']))<br><span class="muted">SKU {{ $l['sku'] }}</span>@endif</td>
+            <td class="r">{{ $l['qty'] }}</td>
+            <td class="r">{{ $eur($l['price']) }}</td>
+            <td class="r">{{ $eur($l['total']) }}</td>
+        </tr>
+    @endforeach
+    @else
     @foreach($o->items as $i)
         <tr>
             <td>{{ $i->name }}@if($i->variant_label) — {{ $i->variant_label }}@endif @if($i->sku)<br><span class="muted">SKU {{ $i->sku }}</span>@endif</td>
@@ -97,13 +110,14 @@
         @if($o->discount > 0)
         <tr><td>Korting</td><td class="r"></td><td class="r"></td><td class="r">{{ $eur(-$o->discount) }}</td></tr>
         @endif
+    @endif
     </tbody>
 </table>
 
 <table class="totals">
     <tr><td>Totaal excl. btw</td><td class="r">{{ $eur($vat['excl']) }}</td></tr>
     <tr><td>Btw {{ rtrim(rtrim(number_format($vat['rate'], 2, ',', ''), '0'), ',') }}%</td><td class="r">{{ $eur($vat['vat']) }}</td></tr>
-    <tr class="grand"><td>{{ $credit ? 'Terugbetaald' : 'Totaal' }} incl. btw</td><td class="r">{{ $eur($o->total) }}</td></tr>
+    <tr class="grand"><td>{{ $credit ? 'Terugbetaald' : 'Totaal' }} incl. btw</td><td class="r">{{ $eur($total ?? $o->total) }}</td></tr>
 </table>
 
 @if($regimeNote)
@@ -112,7 +126,11 @@
 @if($o->tax_amount === null)
 <div class="box muted">Het btw-bedrag is berekend met het vaste tarief voor het land van bestemming.</div>
 @endif
-@if($credit)
+@if($credit && !empty($rma))
+<div class="box">Deze creditnota betreft de terugbetaling voor retour {{ $rma }} van factuur {{ $o->invoice_number }} via de oorspronkelijke betaalmethode.</div>
+@elseif($credit && isset($total) && $total < $o->total)
+<div class="box">Deze creditnota betreft de terugbetaling van het restant van factuur {{ $o->invoice_number }} (eerdere retouren zijn al apart gecrediteerd) via de oorspronkelijke betaalmethode.</div>
+@elseif($credit)
 <div class="box">Deze creditnota betreft de volledige terugbetaling van factuur {{ $o->invoice_number }} via de oorspronkelijke betaalmethode.</div>
 @else
 <div class="box">Betaald via {{ $payment }}. Deze factuur is reeds voldaan.</div>

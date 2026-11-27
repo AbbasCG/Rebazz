@@ -9,6 +9,8 @@ use App\Models\Setting;
 use App\Mail\OrderConfirmationMail;
 use App\Services\CjService;
 use App\Services\InvoiceService;
+use App\Services\OrderLookup;
+use App\Services\ReturnService;
 use App\Services\StockService;
 use App\Services\OrderRecorder;
 use App\Services\Pricing;
@@ -181,23 +183,18 @@ class ShopController extends Controller
     public function track(Request $request): JsonResponse
     {
         $data = $request->validate(['order_no' => ['required', 'string', 'max:30'], 'email' => ['required', 'email', 'max:200']]);
-        $orderNo = strtoupper(trim($data['order_no']));
-        // Per bestelnummer begrensd (los van het IP), zodat gedistribueerd raden van e-mailadressen niet werkt.
-        $lockKey = 'track:'.$orderNo;
-        if (RateLimiter::tooManyAttempts($lockKey, 8)) {
+        ['order' => $order, 'locked' => $locked] = app(OrderLookup::class)->verify($data['order_no'], $data['email']);
+        if ($locked) {
             return response()->json(['error' => 'too_many_attempts'], 429);
         }
-        $order = Order::where('order_no', $orderNo)->first();
-        if (! $order || strcasecmp($order->email, trim($data['email'])) !== 0) {
-            RateLimiter::hit($lockKey, 3600);
-
+        if (! $order) {
             return response()->json(['error' => 'not_found'], 404);
         }
 
         return response()->json([
             'order_no' => $order->order_no, 'date' => $order->paid_at?->toIso8601String(), 'step' => $order->step, 'carrier' => $order->carrier,
             'tracking' => $order->tracking, 'delayed' => $order->delayed, 'refunded' => $order->status === 'refunded',
-        ]);
+        ] + ReturnController::customerView($order, app(ReturnService::class)));
     }
 
     /** Herroepingsformulier: bericht aan de eigenaar en een ontvangstbevestiging aan de klant (op een duurzame drager). */
@@ -347,6 +344,9 @@ class ShopController extends Controller
             return response()->json(['ignored' => 'order_not_found']);
         }
         if ($type === 'charge.refunded') {
+            if (Cache::has('rma-refunding.'.$order->id)) {
+                return response()->json(['ignored' => 'rma_refund_in_progress']); // de retourafhandeling boekt dit zelf
+            }
             if (! ($obj['refunded'] ?? false)) {
                 return response()->json(['ignored' => 'partial_refund']);
             }

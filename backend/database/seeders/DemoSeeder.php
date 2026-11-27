@@ -37,6 +37,32 @@ class DemoSeeder extends Seeder
         return '/media/products/'.$name;
     }
 
+    /** Retouren in verschillende fasen (zonder echte Stripe-betaling): aangevraagd, goedgekeurd en terugbetaald met creditnota. */
+    private function demoReturns(): void
+    {
+        $invoices = app(\App\Services\InvoiceService::class);
+        $make = function (string $orderNo, int $itemIndex, string $status, string $reason, array $extra = []) {
+            $order = Order::where('order_no', $orderNo)->first()?->load('items');
+            $item = $order?->items->values()->get($itemIndex);
+            if (! $item) {
+                return null;
+            }
+            $r = \App\Models\OrderReturn::create([
+                'rma_number' => app(\App\Services\InvoiceService::class)->nextNumber('RMA', (int) now()->format('Y')),
+                'order_id' => $order->id, 'status' => $status, 'reason' => $reason,
+            ] + $extra);
+            $r->items()->create(['order_item_id' => $item->id, 'qty' => 1]);
+
+            return $r;
+        };
+        $make('RB-DEMO01', 0, 'requested', 'defective', ['comment' => 'De koptelefoon laadt niet meer op.']);
+        $make('RB-DEMO01', 1, 'approved', 'changed_mind', ['approved_at' => now()->subDay(), 'admin_note' => 'Gebruik het retourlabel dat in de doos zat.']);
+        $done = $make('RB-DEMO02', 0, 'refunded', 'not_as_described', ['approved_at' => now()->subDays(4), 'received_at' => now()->subDays(2), 'refunded_at' => now()->subDay(), 'refund_amount' => 49.95, 'refund_reference' => 're_demo']);
+        if ($done) {
+            $invoices->ensureReturnCreditNote($done);
+        }
+    }
+
     /** Aura krijgt kleurvarianten (eigen prijs, voorraad en foto per kleur), de tafellamp een fotogalerij. */
     private function demoVariantsAndGallery(): void
     {
@@ -105,6 +131,9 @@ class DemoSeeder extends Seeder
             ['RB-DEMO09', 'US', 'Austin', 'en', 'paid', 1, 'created', null, 3, ['cj_ids' => 'DEMO-CJ-9', 'cj_wait' => true]], // export: geen btw
         ];
 
+        // Demo-retouren worden telkens opnieuw aangemaakt (de bestelregels waaraan ze hangen worden hieronder vervangen).
+        \App\Models\OrderReturn::whereHas('order', fn ($q) => $q->where('order_no', 'like', 'RB-DEMO%'))->delete();
+
         foreach ($scenarios as $n => [$no, $country, $city, $lang, $status, $step, $cj, $vat, $daysAgo, $x]) {
             $lines = [[$products[$n % $products->count()], 1 + ($n % 2)], [$products[($n + 2) % $products->count()], 1]];
             $subtotal = collect($lines)->sum(fn ($l) => $l[0]->price * $l[1]);
@@ -154,6 +183,8 @@ class DemoSeeder extends Seeder
                 $order->forceFill(['updated_at' => now()->subMinutes(45), 'paid_at' => now()->subMinutes(50)])->saveQuietly();
             }
         }
+
+        $this->demoReturns();
 
         foreach (['anna@example.com' => 'nl', 'max@example.com' => 'de', 'lea@example.com' => 'fr'] as $email => $lang) {
             NewsletterSubscriber::updateOrCreate(['email' => $email], ['lang' => $lang, 'confirmed_at' => now()]);

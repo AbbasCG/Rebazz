@@ -67,6 +67,14 @@ class StripeGateway
         $this->client()->refunds->create(['payment_intent' => $paymentIntentId], ['idempotency_key' => 'refund-'.$paymentIntentId]);
     }
 
+    /** Gedeeltelijke terugbetaling (in centen). De idempotency-sleutel voorkomt dat een herhaalde klik dubbel terugbetaalt. Geeft het refund-id terug. */
+    public function refundAmount(string $paymentIntentId, int $cents, string $idempotencyKey): string
+    {
+        $refund = $this->client()->refunds->create(['payment_intent' => $paymentIntentId, 'amount' => $cents], ['idempotency_key' => $idempotencyKey]);
+
+        return (string) $refund->id;
+    }
+
     /** Controleert de handtekening van een Stripe-webhook en geeft het event terug. */
     public function verifyWebhook(string $payload, string $signature): array
     {

@@ -535,6 +535,160 @@ class ShopApiTest extends TestCase
         Http::assertNothingSent();
     }
 
+    /** Betaalde bestelling RB-TEST01 (Aura × 2 = € 159,90, geen verzendkosten), afgeleverd, klaar om te retourneren. */
+    private function deliveredOrder(): Order
+    {
+        $this->stripe->session = $this->paidSession();
+        $this->webhookPaid();
+        $o = Order::first();
+        $o->update(['step' => 4]);
+
+        return $o->fresh('items');
+    }
+
+    private function adminHeaders(): array
+    {
+        return ['Authorization' => 'Bearer '.$this->postJson('/api/admin/login', ['password' => 'test-wachtwoord-123'])->assertOk()->json('token')];
+    }
+
+    private function requestReturn(Order $o, int $qty = 1, string $reason = 'changed_mind', ?string $email = null): \Illuminate\Testing\TestResponse
+    {
+        return $this->postJson('/api/returns', [
+            'order_no' => $o->order_no, 'email' => $email ?? $o->email, 'reason' => $reason, 'comment' => 'Past niet <b>goed</b>',
+            'items' => [['id' => $o->items->first()->id, 'qty' => $qty]],
+        ]);
+    }
+
+    public function test_customer_sees_return_eligibility_and_delivery_starts_the_return_window(): void
+    {
+        \Illuminate\Support\Facades\Mail::fake();
+        $this->stripe->session = $this->paidSession();
+        $this->webhookPaid();
+        $o = Order::first();
+        $track = $this->postJson('/api/orders/track', ['order_no' => 'RB-TEST01', 'email' => 'anna@example.de'])->assertOk()->json();
+        $this->assertTrue($track['returnable']);                       // ook vóór aflevering mag de klant herroepen
+        $this->assertSame(2, $track['items'][0]['returnable']);
+        $this->assertNull($o->fresh()->delivered_at);
+
+        $o->update(['step' => 4]);
+        $this->assertNotNull($o->fresh()->delivered_at);               // aflevering legt het moment vast
+        $o->update(['delivered_at' => now()->subDays(31)]);            // termijn (30 dagen) verstreken
+        $this->assertFalse($this->postJson('/api/orders/track', ['order_no' => 'RB-TEST01', 'email' => 'anna@example.de'])->json('returnable'));
+        $this->requestReturn($o->fresh('items'))->assertStatus(422);
+
+        $o->update(['delivered_at' => now()->subDays(29), 'status' => 'refunded']);
+        $this->assertFalse($this->postJson('/api/orders/track', ['order_no' => 'RB-TEST01', 'email' => 'anna@example.de'])->json('returnable')); // terugbetaald
+    }
+
+    public function test_return_request_is_verified_numbered_limited_and_mailed(): void
+    {
+        \Illuminate\Support\Facades\Mail::fake();
+        $o = $this->deliveredOrder();
+
+        $this->requestReturn($o, 1, 'changed_mind', 'iemand@anders.nl')->assertNotFound();                   // verkeerd e-mailadres
+        $this->requestReturn($o, 1, 'verzonnen')->assertStatus(422);                                         // ongeldige reden
+        $this->requestReturn($o, 3)->assertStatus(422);                                                      // meer dan besteld
+        $res = $this->requestReturn($o, 1)->assertCreated();
+        $this->assertSame('RMA-'.now()->format('Y').'-00001', $res->json('rma'));
+        $this->assertSame(1, $res->json('items.0.returnable'));                                              // 1 van 2 is nu gereserveerd
+        $this->assertSame('requested', $res->json('returns.0.status'));
+        $this->assertSame('Past niet goed', \App\Models\OrderReturn::first()->comment);                       // HTML weggehaald
+
+        $this->requestReturn($o, 2)->assertStatus(422);                                                      // nog maar 1 over
+        $this->requestReturn($o, 1)->assertCreated();                                                        // de rest mag wel
+        $this->requestReturn($o, 1)->assertStatus(422);                                                      // alles gereserveerd
+        \Illuminate\Support\Facades\Mail::assertSent(\App\Mail\ReturnMail::class, fn ($m) => $m->kind === 'requested' && $m->hasTo('anna@example.de') && str_contains($m->envelope()->subject, 'Rücksendeanfrage')); // lang=de
+    }
+
+    public function test_return_flow_approve_receive_with_restock_and_partial_refund_with_credit_note(): void
+    {
+        \Illuminate\Support\Facades\Mail::fake();
+        Product::whereKey('p1')->update(['track_stock' => true, 'stock' => 10]);
+        $o = $this->deliveredOrder();                                           // 10 − 2 = 8 op voorraad
+        $this->assertSame(8, Product::find('p1')->stock);
+        $h = $this->adminHeaders();
+        $rma = $this->requestReturn($o, 1)->assertCreated()->json('rma');
+
+        $this->postJson("/api/admin/returns/$rma/refund", ['amount' => 10], $h)->assertStatus(409);           // eerst goedkeuren/ontvangen
+        $this->postJson("/api/admin/returns/$rma/approve", ['note' => 'Gebruik het label in de doos.'], $h)->assertOk()->assertJsonPath('return.status', 'approved');
+        $this->postJson("/api/admin/returns/$rma/approve", [], $h)->assertStatus(409);                          // niet nog eens
+        $mine = $this->postJson('/api/orders/track', ['order_no' => 'RB-TEST01', 'email' => 'anna@example.de'])->json('returns.0');
+        $this->assertSame('Gebruik het label in de doos.', $mine['note']);
+        $this->assertNotEmpty($mine['returnAddress']);                                                          // retouradres pas na goedkeuring
+
+        $this->postJson("/api/admin/returns/$rma/receive", ['restock' => true], $h)->assertOk()->assertJsonPath('return.status', 'received');
+        $this->assertSame(9, Product::find('p1')->stock);                                                       // 1 stuk terug op voorraad
+        $this->assertSame(1, $o->items()->first()->fresh()->stock_deducted);                                    // niet meer terugboeken dan afgeschreven
+
+        $this->postJson("/api/admin/returns/$rma/refund", ['amount' => 500], $h)->assertStatus(409);           // meer dan de bestelling
+        $this->postJson("/api/admin/returns/$rma/refund", ['amount' => 79.95], $h)->assertOk()->assertJsonPath('return.status', 'refunded');
+        $this->assertSame([['pi_123', 7995, 'rma-'.$rma]], $this->stripe->partialRefunds);                    // bedrag in centen + idempotency-sleutel per retour
+        $this->postJson("/api/admin/returns/$rma/refund", ['amount' => 79.95], $h)->assertStatus(409);        // niet dubbel terugbetalen
+        $this->assertCount(1, $this->stripe->partialRefunds);
+
+        $order = Order::first();
+        $this->assertSame('paid', $order->status);                                                              // deels terugbetaald: bestelling blijft betaald
+        $ret = \App\Models\OrderReturn::first();
+        $this->assertStringStartsWith('RBC-'.now()->format('Y').'-', $ret->credit_note_number);
+        $this->assertNull($order->credit_note_number);                                                          // de creditnota hoort bij de retour
+        $url = app(\App\Services\InvoiceService::class)->returnSignedUrl($ret);
+        $this->assertStringStartsWith('%PDF', $this->get($url)->assertOk()->getContent());
+        $this->get($url.'x')->assertForbidden();
+        $this->assertStringStartsWith('%PDF', $this->get("/api/admin/returns/$rma/credit-note", $h)->assertOk()->getContent());
+        $this->assertNotNull($this->postJson('/api/orders/track', ['order_no' => 'RB-TEST01', 'email' => 'anna@example.de'])->json('returns.0.creditNoteUrl'));
+        \Illuminate\Support\Facades\Mail::assertSent(\App\Mail\ReturnMail::class, fn ($m) => $m->kind === 'refunded');
+    }
+
+    public function test_refunding_the_rest_of_the_order_through_returns_marks_it_refunded_without_a_second_credit_note(): void
+    {
+        \Illuminate\Support\Facades\Mail::fake();
+        $o = $this->deliveredOrder();
+        $h = $this->adminHeaders();
+        $a = $this->requestReturn($o, 1)->assertCreated()->json('rma');
+        $b = $this->requestReturn($o, 1)->assertCreated()->json('rma');
+        foreach ([$a, $b] as $rma) {
+            $this->postJson("/api/admin/returns/$rma/approve", [], $h)->assertOk();
+            $this->postJson("/api/admin/returns/$rma/refund", ['amount' => 79.95], $h)->assertOk();
+        }
+        $order = Order::first();
+        $this->assertSame('refunded', $order->status);                       // alles terugbetaald
+        $this->assertNull($order->credit_note_number);                       // de twee retour-creditnota's dekken het geheel
+        $notes = \App\Models\OrderReturn::pluck('credit_note_number');
+        $this->assertCount(2, $notes->filter()->unique());                   // twee verschillende, doorlopende nummers
+        $this->get(app(\App\Services\InvoiceService::class)->signedUrl($order, 'credit'))->assertNotFound();
+        $this->assertSame(0, \Illuminate\Support\Facades\DB::table('document_counters')->where('key', 'like', 'rbc-%')->where('last', '!=', 2)->count()); // geen nummer verspild
+    }
+
+    public function test_rejected_return_shows_the_reason_to_the_customer_and_needs_a_note(): void
+    {
+        \Illuminate\Support\Facades\Mail::fake();
+        $o = $this->deliveredOrder();
+        $this->getJson('/api/admin/returns')->assertUnauthorized();                                             // beheer vereist login
+        $h = $this->adminHeaders();
+        $rma = $this->requestReturn($o)->assertCreated()->json('rma');
+
+        $this->postJson("/api/admin/returns/$rma/reject", [], $h)->assertStatus(422);                           // reden verplicht
+        $this->postJson("/api/admin/returns/$rma/reject", ['note' => 'Product is gebruikt.'], $h)->assertOk()->assertJsonPath('return.status', 'rejected');
+        $mine = $this->postJson('/api/orders/track', ['order_no' => 'RB-TEST01', 'email' => 'anna@example.de'])->json();
+        $this->assertSame('Product is gebruikt.', $mine['returns'][0]['note']);
+        $this->assertNull($mine['returns'][0]['returnAddress']);
+        $this->assertSame(2, $mine['items'][0]['returnable']);                                                  // afgewezen retour reserveert niets meer
+        $this->postJson("/api/admin/returns/$rma/approve", [], $h)->assertStatus(409);                          // afgewezen is definitief
+        $this->postJson('/api/admin/returns/RMA-1999-00001/approve', [], $h)->assertNotFound();
+        $this->assertCount(1, $this->getJson('/api/admin/returns', $h)->assertOk()->json('returns'));
+    }
+
+    public function test_stripe_refund_webhook_is_ignored_while_a_return_refund_is_in_progress(): void
+    {
+        \Illuminate\Support\Facades\Mail::fake();
+        $o = $this->deliveredOrder();
+        \Illuminate\Support\Facades\Cache::put('rma-refunding.'.$o->id, 1, 60);
+        $this->call('POST', '/api/stripe/webhook', [], [], [], ['HTTP_STRIPE_SIGNATURE' => 'ok', 'CONTENT_TYPE' => 'application/json'],
+            json_encode(['type' => 'charge.refunded', 'data' => ['object' => ['payment_intent' => 'pi_123', 'refunded' => true]]]))->assertOk()->assertJson(['ignored' => 'rma_refund_in_progress']);
+        $this->assertSame('paid', Order::first()->status);
+        $this->assertNull(Order::first()->credit_note_number);
+    }
+
     public function test_refunded_orders_are_never_placed_at_cj(): void
     {
         config(['shop.cj.api_key' => 'CJ@api@key']);
@@ -643,6 +797,15 @@ class FakeStripe extends StripeGateway
     public array $lastParams = [];
     public array $session = [];
     public array $refunds = [];
+    /** @var array<int, array{0: string, 1: int, 2: string}> gedeeltelijke terugbetalingen: [payment_intent, centen, idempotency-sleutel] */
+    public array $partialRefunds = [];
+
+    public function refundAmount(string $paymentIntentId, int $cents, string $idempotencyKey): string
+    {
+        $this->partialRefunds[] = [$paymentIntentId, $cents, $idempotencyKey];
+
+        return 're_test_'.count($this->partialRefunds);
+    }
 
     public function configured(): bool { return true; }
     public function mode(): string { return 'test'; }

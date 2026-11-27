@@ -97,6 +97,47 @@ export interface Catalog {
   products: Product[];
 }
 
+/** Retour zoals de klant die ziet. */
+export interface CustomerReturn {
+  rma: string;
+  status: 'requested' | 'approved' | 'rejected' | 'received' | 'refunded';
+  reason: string;
+  date: string;
+  items: { name: string; qty: number }[];
+  note: string | null;
+  returnAddress: string | null;
+  refundAmount: number | null;
+  creditNoteUrl: string | null;
+}
+
+/** Antwoord van "bestelling volgen", inclusief retourgegevens. */
+export interface TrackedOrder {
+  order_no: string; date: string; step: number; carrier: string; tracking: string; delayed: boolean; refunded: boolean;
+  returnable: boolean;
+  returnDeadline: string;
+  items: { id: number; name: string; qty: number; returnable: number }[];
+  returns: CustomerReturn[];
+}
+
+/** Retour in het beheer. */
+export interface AdminReturn {
+  id: string;
+  status: CustomerReturn['status'];
+  reason: string;
+  comment: string | null;
+  adminNote: string | null;
+  returnTracking: string;
+  refundAmount: number | null;
+  creditNote: string | null;
+  date: string;
+  approvedAt: string | null;
+  receivedAt: string | null;
+  refundedAt: string | null;
+  order: { id: string; customer: string; email: string; country: string; total: number; status: string };
+  items: { name: string; qty: number; price: number; tracked: boolean; restocked: number }[];
+  suggestedRefund: number;
+}
+
 export interface CartLine {
   id: string;
   qty: number;

@@ -48,6 +48,25 @@ class StockService
         return $short;
     }
 
+    /**
+     * Zet $qty stuks van een bestelregel terug op voorraad (bij een ontvangen retour). Alleen zoveel als er van deze regel
+     * werkelijk is afgeschreven; zo kan een retour nooit meer voorraad opleveren dan er verkocht is. Geeft het teruggeboekte aantal.
+     */
+    public function restockItem(\App\Models\OrderItem $item, int $qty): int
+    {
+        $back = min(max(0, $qty), (int) $item->stock_deducted);
+        if ($back < 1 || ! $item->product_id) {
+            return 0;
+        }
+        $item->variant_id
+            ? ProductVariant::whereKey($item->variant_id)->increment('stock', $back)
+            : Product::whereKey($item->product_id)->increment('stock', $back);
+        $item->update(['stock_deducted' => $item->stock_deducted - $back]);
+        Cache::forget('shop.catalog');
+
+        return $back;
+    }
+
     /** Boekt afgeschreven stuks terug als de bestelling nog niet is verzonden (retour van verzonden goederen is een handmatige beslissing). */
     public function restockIfUnshipped(Order $order): int
     {

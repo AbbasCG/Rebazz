@@ -1,5 +1,5 @@
 /* Verbinding met de Laravel-API. In ontwikkeling stuurt Vite /api door naar Laravel. */
-import type { Catalog, Order, Product } from './types';
+import type { AdminReturn, Catalog, Order, Product, TrackedOrder } from './types';
 
 export class ApiError extends Error {
   status: number;
@@ -60,7 +60,10 @@ export const api = {
   checkout: (body: { items: { id: string; qty: number; name: string }[]; country: string; ship: string; lang: string }) =>
     request<{ url: string; order_no: string }>('POST', '/checkout', body),
   confirm: (sessionId: string) => request<{ order_no: string; paid: boolean; total: number; email: string; country: string }>('GET', '/orders/confirm?session_id=' + encodeURIComponent(sessionId)),
-  track: (orderNo: string, email: string) => request<{ order_no: string; date: string; step: number; carrier: string; tracking: string; delayed: boolean; refunded: boolean }>('POST', '/orders/track', { order_no: orderNo, email }),
+  track: (orderNo: string, email: string) => request<TrackedOrder>('POST', '/orders/track', { order_no: orderNo, email }),
+  /** Retour aanvragen (bestelnummer + e-mailadres als controle). Geeft de bijgewerkte retourgegevens terug. */
+  createReturn: (body: { order_no: string; email: string; items: { id: number; qty: number }[]; reason: string; comment: string }) =>
+    request<{ ok: boolean; rma: string } & Pick<TrackedOrder, 'returnable' | 'returnDeadline' | 'items' | 'returns'>>('POST', '/returns', body),
   withdrawal: (body: { name: string; email: string; order_no: string; items: string; message: string }) => request<{ ok: boolean }>('POST', '/withdrawal', body),
   newsletter: (email: string, lang: string) => request<{ ok: boolean }>('POST', '/newsletter', { email, lang }),
 
@@ -74,6 +77,15 @@ export const api = {
     orderAction: (id: string, action: 'refund' | 'notify' | 'cj-order' | 'cj-check') =>
       request<{ order: Order; mailed?: boolean }>('POST', '/admin/orders/' + encodeURIComponent(id) + '/' + action, {}, true),
     cjSync: () => request<{ checked: number; changed: number }>('POST', '/admin/cj-sync', {}, true),
+    returns: () => request<{ returns: AdminReturn[] }>('GET', '/admin/returns', undefined, true),
+    returnAction: (id: string, action: 'approve' | 'reject' | 'receive' | 'refund', body: Record<string, unknown> = {}) =>
+      request<{ return: AdminReturn }>('POST', '/admin/returns/' + encodeURIComponent(id) + '/' + action, body, true),
+    /** Creditnota (PDF) van een retour. */
+    returnCreditNote: async (id: string): Promise<Blob> => {
+      const res = await fetch(BASE + '/api/admin/returns/' + encodeURIComponent(id) + '/credit-note', { headers: { Authorization: 'Bearer ' + adminToken.get(), Accept: 'application/pdf' } });
+      if (!res.ok) throw new ApiError('Creditnota niet beschikbaar (' + res.status + ')', res.status, null);
+      return res.blob();
+    },
     /** Productfoto uploaden (JPG, PNG of WebP, max. 4 MB). Geeft het adres terug, bijv. /media/products/abc.jpg */
     upload: async (file: File): Promise<string> => {
       const body = new FormData();

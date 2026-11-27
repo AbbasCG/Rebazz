@@ -35,6 +35,9 @@ return [
     // Waarschuwingen (mislukte CJ-bestelling, terugbetaling, betwisting) gaan hierheen; leeg = het e-mailadres uit de bedrijfsgegevens.
     'owner_alert_email' => env('OWNER_ALERT_EMAIL'),
 
+    // Retourtermijn (dagen na aflevering). De wettelijke bedenktijd is 14 dagen; de winkel belooft 30 dagen.
+    'return_days' => (int) env('SHOP_RETURN_DAYS', 30),
+
     'currency' => 'eur',
 
     // Standaard bedrijfsgegevens; aanpasbaar in het dashboard (opgeslagen in de tabel settings).
