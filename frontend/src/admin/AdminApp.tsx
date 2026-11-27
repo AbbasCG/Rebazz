@@ -11,6 +11,7 @@ import Ads from './views/Ads';
 import Automations from './views/Automations';
 import Checklist from './views/Checklist';
 import Orders from './views/Orders';
+import Privacy from './views/Privacy';
 import Returns from './views/Returns';
 import Overview from './views/Overview';
 import Products from './views/Products';
@@ -35,6 +36,7 @@ export const ROUTES = [
     { id: 'automatisering', label: 'Automatiseringen', icon: 'bot', sub: 'Terugkerende taken automatisch laten uitvoeren' }
   ] },
   { group: 'Beheer', items: [
+    { id: 'privacy', label: 'Privacy (AVG)', icon: 'shield', sub: 'Inzage, export en wissen van persoonsgegevens; bewaartermijnen' },
     { id: 'belasting', label: 'Belasting (btw)', icon: 'receipt', sub: 'Btw per kwartaal, OSS-drempel en aangiftedeadlines' },
     { id: 'instellingen', label: 'Instellingen', icon: 'sliders', sub: 'Winkelgegevens, betalingen, verzending en koppelingen' },
     { id: 'checklist', label: 'Lanceringschecklist', icon: 'checklist', sub: 'Alles wat geregeld moet zijn vóór de lancering' }
@@ -188,6 +190,7 @@ function Shell({ onLogout }: { onLogout: () => void }) {
               <Route path="retouren" element={<Returns />} />
               <Route path="klantenservice" element={<Support />} />
               <Route path="automatisering" element={<Automations />} />
+              <Route path="privacy" element={<Privacy />} />
               <Route path="belasting" element={<Tax />} />
               <Route path="instellingen" element={<Settings />} />
               <Route path="checklist" element={<Checklist />} />

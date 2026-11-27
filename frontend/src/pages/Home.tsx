@@ -32,8 +32,9 @@ function HomeContent() {
   // Terug van de link in de bevestigingsmail van de nieuwsbrief (?newsletter=confirmed).
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    if (params.get('newsletter') === 'confirmed') {
-      toast(t('nl_confirmed'));
+    const nl = params.get('newsletter');
+    if (nl === 'confirmed' || nl === 'unsubscribed') {
+      toast(t(nl === 'confirmed' ? 'nl_confirmed' : 'nl_unsub'));
       params.delete('newsletter');
       const qs = params.toString();
       window.history.replaceState(null, '', window.location.pathname + (qs ? '?' + qs : ''));

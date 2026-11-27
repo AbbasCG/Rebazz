@@ -11,7 +11,7 @@ class Order extends Model
         'order_no', 'stripe_session_id', 'payment_intent_id', 'livemode', 'status', 'customer_name', 'email', 'phone', 'country',
         'address', 'lang', 'subtotal', 'discount', 'shipping', 'total', 'tax_amount', 'cost', 'payment_method', 'ship_method', 'step', 'carrier',
         'tracking', 'delayed', 'cj_status', 'cj_order_ids', 'cj_error', 'cj_wait', 'paid_at',
-        'invoice_number', 'invoice_issued_at', 'credit_note_number', 'credit_note_issued_at', 'confirmation_sent_at', 'delivered_at',
+        'invoice_number', 'invoice_issued_at', 'credit_note_number', 'credit_note_issued_at', 'confirmation_sent_at', 'delivered_at', 'anonymized_at',
     ];
 
     protected function casts(): array
@@ -33,6 +33,7 @@ class Order extends Model
             'credit_note_issued_at' => 'datetime',
             'confirmation_sent_at' => 'datetime',
             'delivered_at' => 'datetime',
+            'anonymized_at' => 'datetime',
         ];
     }
 

@@ -64,6 +64,10 @@ export const api = {
   /** Retour aanvragen (bestelnummer + e-mailadres als controle). Geeft de bijgewerkte retourgegevens terug. */
   createReturn: (body: { order_no: string; email: string; items: { id: number; qty: number }[]; reason: string; comment: string }) =>
     request<{ ok: boolean; rma: string } & Pick<TrackedOrder, 'returnable' | 'returnDeadline' | 'items' | 'returns'>>('POST', '/returns', body),
+  /** AVG: inzage of wissen aanvragen. Het antwoord is altijd hetzelfde; bij bekende gegevens volgt een e-mail met een tijdelijke link. */
+  privacyRequest: (email: string, type: 'export' | 'erase') => request<{ ok: boolean }>('POST', '/privacy/request', { email, type }),
+  /** Wissen bevestigen met de ondertekende query (email, expires, signature) uit de e-mail. */
+  privacyErase: (signedQuery: string) => request<PrivacyEraseResult>('POST', '/privacy/erase?' + signedQuery.replace(/^\?/, ''), {}),
   withdrawal: (body: { name: string; email: string; order_no: string; items: string; message: string }) => request<{ ok: boolean }>('POST', '/withdrawal', body),
   newsletter: (email: string, lang: string) => request<{ ok: boolean }>('POST', '/newsletter', { email, lang }),
 
@@ -78,6 +82,15 @@ export const api = {
       request<{ order: Order; mailed?: boolean }>('POST', '/admin/orders/' + encodeURIComponent(id) + '/' + action, {}, true),
     cjSync: () => request<{ checked: number; changed: number }>('POST', '/admin/cj-sync', {}, true),
     returns: () => request<{ returns: AdminReturn[] }>('GET', '/admin/returns', undefined, true),
+    privacyLookup: (email: string) => request<PrivacyLookup>('GET', '/admin/privacy/lookup?email=' + encodeURIComponent(email), undefined, true),
+    privacyErase: (email: string) => request<PrivacyEraseResult>('POST', '/admin/privacy/erase', { email }, true),
+    privacyRequests: () => request<{ requests: PrivacyLogRow[] }>('GET', '/admin/privacy/requests', undefined, true),
+    /** Alle gegevens over een e-mailadres als JSON-bestand (art. 15/20 AVG). */
+    privacyExport: async (email: string): Promise<Blob> => {
+      const res = await fetch(BASE + '/api/admin/privacy/export?email=' + encodeURIComponent(email), { headers: { Authorization: 'Bearer ' + adminToken.get(), Accept: 'application/json' } });
+      if (!res.ok) throw new ApiError('Export niet beschikbaar (' + res.status + ')', res.status, null);
+      return res.blob();
+    },
     returnAction: (id: string, action: 'approve' | 'reject' | 'receive' | 'refund', body: Record<string, unknown> = {}) =>
       request<{ return: AdminReturn }>('POST', '/admin/returns/' + encodeURIComponent(id) + '/' + action, body, true),
     /** Creditnota (PDF) van een retour. */
@@ -113,6 +126,25 @@ export const api = {
     subscribers: () => request<{ subscribers: { email: string; lang: string; created_at: string }[] }>('GET', '/admin/subscribers', undefined, true)
   }
 };
+
+export interface PrivacyLookup {
+  email: string;
+  summary: { orders: number; returns: number; newsletter: boolean };
+  orders: { id: string; date: string | null; total: number; status: string; anonymized: boolean; retainedUntil: string }[];
+  retentionYears: number;
+}
+
+export interface PrivacyLogRow {
+  id: number; who: string; type: 'export' | 'erase'; source: string; status: string; requestedAt: string; completedAt: string | null;
+  result: Record<string, unknown> | null;
+}
+
+export interface PrivacyEraseResult {
+  newsletter_deleted: boolean;
+  orders_minimized: number;
+  orders_anonymized: number;
+  orders_retained: { order: string; until: string }[];
+}
 
 export interface TaxRow { country: string; regime: 'nl' | 'oss' | 'export'; rate: number; orders: number; incl: number; excl: number; vat: number }
 export interface TaxSummary {

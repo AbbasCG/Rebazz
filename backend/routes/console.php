@@ -65,3 +65,11 @@ Artisan::command('shop:send-confirmations', function () {
 })->purpose('Verstuur ontbrekende orderbevestigingen (laatste 48 uur)');
 
 Schedule::command('shop:send-confirmations')->everyTenMinutes()->withoutOverlapping();
+
+/* AVG: bewaartermijnen afdwingen (bestellingen na 7 jaar anonimiseren, niet-bevestigde nieuwsbriefaanmeldingen na 30 dagen wissen). */
+Artisan::command('shop:gdpr-retention', function (\App\Services\PrivacyService $privacy) {
+    $r = $privacy->runRetention();
+    $this->info("Geanonimiseerde bestellingen: {$r['anonymized']}, niet-bevestigde aanmeldingen gewist: {$r['newsletter_pending_deleted']}, oude verzoeken opgeruimd: {$r['requests_deleted']}");
+})->purpose('Pas de AVG-bewaartermijnen toe');
+
+Schedule::command('shop:gdpr-retention')->dailyAt('03:30')->withoutOverlapping();

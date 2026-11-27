@@ -146,6 +146,7 @@ function Footer() {
               <li><Link to="/juridisch#cookies">{t('f_cookies')}</Link></li>
               <li><a href="#cookie-instellingen" onClick={e => { e.preventDefault(); openCookieSettings(); }}>{t('ck_prefs')}</a></li>
               <li><Link to="/juridisch#herroeping">{t('f_withdrawal')}</Link></li>
+              <li><Link to="/privacy-verzoek">{t('f_mydata')}</Link></li>
               <li><Link to="/juridisch#contact">{t('f_contact')}</Link></li>
             </ul>
           </div>

@@ -38,6 +38,9 @@ return [
     // Retourtermijn (dagen na aflevering). De wettelijke bedenktijd is 14 dagen; de winkel belooft 30 dagen.
     'return_days' => (int) env('SHOP_RETURN_DAYS', 30),
 
+    // AVG: bestel- en factuurgegevens moeten fiscaal 7 jaar bewaard blijven (Nederland); daarna worden persoonsgegevens geanonimiseerd.
+    'retention_years' => (int) env('SHOP_RETENTION_YEARS', 7),
+
     'currency' => 'eur',
 
     // Standaard bedrijfsgegevens; aanpasbaar in het dashboard (opgeslagen in de tabel settings).

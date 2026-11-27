@@ -20,6 +20,7 @@ const Checkout = lazy(() => import('./pages/Checkout'));
 const Thanks = lazy(() => import('./pages/Thanks'));
 const Legal = lazy(() => import('./pages/Legal'));
 const ProductPage = lazy(() => import('./pages/ProductPage'));
+const PrivacyRequest = lazy(() => import('./pages/PrivacyRequest'));
 const NotFound = lazy(() => import('./pages/NotFound'));
 
 function Page({ children }: { children: React.ReactNode }) {
@@ -49,6 +50,8 @@ function ShopRoutes() {
           <Route path="/checkout" element={<Page><Checkout /></Page>} />
           <Route path="/bedankt" element={<Page><Thanks /></Page>} />
           <Route path="/product/:id/*" element={<Page><ProductPage /></Page>} />
+          <Route path="/privacy-verzoek" element={<Page><PrivacyRequest mode="request" /></Page>} />
+          <Route path="/privacy-verzoek/bevestigen" element={<Page><PrivacyRequest mode="confirm" /></Page>} />
           <Route path="/juridisch" element={<Page><Legal /></Page>} />
           <Route path="/beheer/*" element={<Suspense fallback={<div style={{ padding: 40 }}>Laden…</div>}><Admin /></Suspense>} />
           <Route path="*" element={<Page><NotFound /></Page>} />
