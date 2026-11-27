@@ -10,6 +10,7 @@ Route::post('/checkout', [ShopController::class, 'checkout'])->middleware('throt
 Route::get('/orders/confirm', [ShopController::class, 'confirm'])->middleware('throttle:30,1');
 Route::post('/orders/track', [ShopController::class, 'track'])->middleware('throttle:10,1');
 Route::post('/withdrawal', [ShopController::class, 'withdrawal'])->middleware('throttle:5,10');
+Route::get('/newsletter/confirm', [ShopController::class, 'confirmNewsletter'])->middleware('throttle:30,1');
 Route::post('/newsletter', [ShopController::class, 'newsletter'])->middleware('throttle:5,1');
 Route::post('/stripe/webhook', [ShopController::class, 'stripeWebhook'])->middleware('throttle:240,1');
 

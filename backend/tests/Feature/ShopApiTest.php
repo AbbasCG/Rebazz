@@ -232,6 +232,55 @@ class ShopApiTest extends TestCase
         $this->assertFalse($this->stripe->lastParams['allow_promotion_codes']);
     }
 
+    public function test_newsletter_needs_double_opt_in_and_hides_whether_address_exists(): void
+    {
+        config(['mail.default' => 'array', 'app.url' => 'http://localhost']);
+        $r1 = $this->postJson('/api/newsletter', ['email' => 'Nieuw@Example.nl', 'lang' => 'nl'])->assertOk()->json();
+        $sub = \App\Models\NewsletterSubscriber::first();
+        $this->assertNull($sub->confirmed_at);
+        $this->assertSame(48, strlen($sub->confirm_token));
+
+        // Ongeldige token bevestigt niets.
+        $this->get('/api/newsletter/confirm?token='.str_repeat('x', 48))->assertRedirect();
+        $this->assertNull($sub->fresh()->confirmed_at);
+
+        $this->get('/api/newsletter/confirm?token='.$sub->confirm_token)->assertRedirect('https://rebazz.test/?newsletter=confirmed');
+        $this->assertNotNull($sub->fresh()->confirmed_at);
+        $this->assertNull($sub->fresh()->confirm_token);
+
+        // Opnieuw aanmelden van een bevestigd adres: zelfde antwoord, toestemming blijft en er komt geen nieuwe token.
+        $r2 = $this->postJson('/api/newsletter', ['email' => 'nieuw@example.nl'])->assertOk()->json();
+        $this->assertSame($r1, $r2);
+        $this->assertNotNull($sub->fresh()->confirmed_at);
+        $this->assertNull($sub->fresh()->confirm_token);
+    }
+
+    public function test_checkout_rejects_carts_that_exceed_stripe_metadata_limit_and_uses_database_names(): void
+    {
+        $this->postJson('/api/checkout', ['items' => [['id' => 'p1', 'qty' => 1, 'name' => 'GRATIS <b>iPhone</b>']], 'country' => 'NL'])->assertOk();
+        $this->assertSame('Aura draadloze koptelefoon met ANC', $this->stripe->lastParams['line_items'][0]['price_data']['product_data']['name']);
+    }
+
+    public function test_cj_token_is_refreshed_once_when_it_is_rejected(): void
+    {
+        config(['shop.cj.api_key' => 'CJ@api@key']);
+        \Illuminate\Support\Facades\Cache::put('cj.token', 'OUD', 600);
+        Product::whereKey('p1')->update(['cj_vid' => 'VID-AURA', 'cj_from' => 'PL']);
+        Http::fake([
+            '*/authentication/getAccessToken' => Http::response(['code' => 200, 'result' => true, 'data' => ['accessToken' => 'NIEUW']]),
+            '*/logistic/freightCalculate' => fn ($req) => $req->header('CJ-Access-Token')[0] === 'OUD'
+                ? Http::response(['code' => 1600001, 'result' => false, 'message' => 'Token is expired'], 401)
+                : Http::response(['code' => 200, 'result' => true, 'data' => [['logisticName' => 'CJPacket', 'logisticPrice' => '4']]]),
+            '*/shopping/order/createOrderV2' => Http::response(['code' => 200, 'result' => true, 'data' => ['orderId' => 'CJ-OK']]),
+        ]);
+        $this->stripe->session = $this->paidSession();
+        $this->getJson('/api/orders/confirm?session_id=cs_test_abc123')->assertOk();
+
+        $o = Order::first();
+        $this->assertSame('CJ-OK', $o->cj_order_ids);
+        $this->assertSame('NIEUW', \Illuminate\Support\Facades\Cache::get('cj.token'));
+    }
+
     public function test_refunded_orders_are_never_placed_at_cj(): void
     {
         config(['shop.cj.api_key' => 'CJ@api@key']);
@@ -303,6 +352,7 @@ class ShopApiTest extends TestCase
         $this->assertSame('error', $o->cj_status);
         $this->assertSame('CJ-FIRST', $o->cj_order_ids);
         $this->assertStringContainsString('DEELS BESTELD', $o->cj_error);
+        $this->assertTrue((bool) $o->cj_wait); // tracking blijft opgehaald worden voor de al bestelde groep
     }
 
     public function test_refund_webhook_marks_order_refunded_and_ignores_partial_refunds(): void

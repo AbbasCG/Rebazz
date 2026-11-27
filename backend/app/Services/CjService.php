@@ -22,7 +22,7 @@ class CjService
         return (bool) config('shop.cj.api_key');
     }
 
-    private function call(string $method, string $path, ?array $body = null): mixed
+    private function call(string $method, string $path, ?array $body = null, bool $retried = false): mixed
     {
         $req = Http::acceptJson()->timeout(20);
         if (! str_starts_with($path, '/authentication')) {
@@ -32,6 +32,12 @@ class CjService
         $res = $method === 'GET' ? $req->get($url) : $req->post($url, $body ?? []);
         $data = $res->json() ?? [];
         if (! $res->successful() || ($data['result'] ?? true) === false || (isset($data['code']) && (int) $data['code'] !== 200)) {
+            // Verlopen of ingetrokken toegangstoken: token weggooien en één keer opnieuw proberen (anders blijft alles 10 dagen falen).
+            if (! $retried && ! str_starts_with($path, '/authentication') && ($res->status() === 401 || preg_match('/token|unauthori[sz]ed/i', (string) ($data['message'] ?? '')))) {
+                Cache::forget('cj.token');
+
+                return $this->call($method, $path, $body, true);
+            }
             throw new RuntimeException('CJ: '.($data['message'] ?? 'HTTP '.$res->status()).(isset($data['code']) ? ' ('.$data['code'].')' : ''));
         }
 
@@ -173,7 +179,8 @@ class CjService
         } catch (Throwable $e) {
             Log::warning('CJ bestellen mislukt', ['order' => $order->order_no, 'error' => $e->getMessage()]);
             $partial = $order->fresh()->cj_order_ids ? ' [DEELS BESTELD bij CJ: '.$order->fresh()->cj_order_ids.' — niet opnieuw bestellen, handmatig afronden]' : '';
-            $order->update(['cj_status' => 'error', 'cj_error' => mb_substr($e->getMessage().$partial, 0, 450)]);
+            // Deels bestelde bestelling: wel tracking blijven ophalen voor de groepen die al bij CJ staan.
+            $order->update(['cj_status' => 'error', 'cj_error' => mb_substr($e->getMessage().$partial, 0, 450)] + ($partial ? ['cj_wait' => true] : []));
             $this->alertOwner($order, $e->getMessage().$partial);
         }
 

@@ -246,6 +246,6 @@ class AdminController extends Controller
 
     public function subscribers(): JsonResponse
     {
-        return response()->json(['subscribers' => NewsletterSubscriber::orderByDesc('created_at')->limit(1000)->get(['email', 'lang', 'created_at'])]);
+        return response()->json(['subscribers' => NewsletterSubscriber::confirmed()->orderByDesc('created_at')->limit(1000)->get(['email', 'lang', 'created_at'])]);
     }
 }

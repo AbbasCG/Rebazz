@@ -110,7 +110,7 @@ class DemoSeeder extends Seeder
         }
 
         foreach (['anna@example.com' => 'nl', 'max@example.com' => 'de', 'lea@example.com' => 'fr'] as $email => $lang) {
-            NewsletterSubscriber::updateOrCreate(['email' => $email], ['lang' => $lang]);
+            NewsletterSubscriber::updateOrCreate(['email' => $email], ['lang' => $lang, 'confirmed_at' => now()]);
         }
 
         $this->command?->info('Demo klaar: '.$products->count().' actieve producten, '.count($scenarios).' bestellingen, 3 nieuwsbriefabonnees.');

@@ -77,11 +77,13 @@ class ShopController extends Controller
         }
 
         $lang = $data['lang'] ?? 'en';
-        $names = collect($data['items'])->mapWithKeys(fn ($i) => [$i['id'] => trim(strip_tags($i['name'] ?? ''))]);
         $orderNo = 'RB-'.strtoupper(base_convert((string) (int) (microtime(true) * 1000), 10, 36)).strtoupper(Str::random(2));
         $origin = rtrim((string) config('shop.frontend_url'), '/');
         $tax = config('shop.stripe.tax');
         $packed = collect($q['lines'])->map(fn ($l) => $l['product']->id.':'.$l['qty'])->implode(',');
+        if (strlen($packed) > 480) { // Stripe-metadata: maximaal 500 tekens per waarde
+            return response()->json(['error' => 'cart_too_large', 'message' => 'Te veel verschillende producten in één bestelling. Splits uw bestelling.'], 422);
+        }
 
         try {
             $session = $stripe->createCheckoutSession(array_filter([
@@ -94,7 +96,7 @@ class ShopController extends Controller
                         'unit_amount' => (int) round($l['product']->price * 100),
                         'tax_behavior' => $tax ? 'inclusive' : null,
                         'product_data' => array_filter([
-                            'name' => mb_substr($names[$l['product']->id] ?: $l['product']->name, 0, 120),
+                            'name' => mb_substr($l['product']->name, 0, 120),
                             'images' => str_starts_with($l['product']->image, 'https://') ? [$l['product']->image] : null,
                             'metadata' => ['sku' => $l['product']->sku, 'product_id' => $l['product']->id],
                         ]),
@@ -205,13 +207,20 @@ class ShopController extends Controller
             Mail::raw("Herroeping ontvangen ($at)\n\nNaam: $name\nE-mail: {$data['email']}\nBestelnummer: $orderNo\nProducten: $items\nOpmerking: $note\n", function ($m) use ($owner, $data, $orderNo) {
                 $m->to($owner)->replyTo($data['email'])->subject('Herroeping '.$orderNo);
             });
-            Mail::raw("Beste $name,\n\nWij hebben uw herroeping van bestelling $orderNo ontvangen op $at.\nProducten: $items\n\nU ontvangt van ons binnen 24 uur het retouradres. Het aankoopbedrag wordt binnen 14 dagen na ontvangst van uw herroeping terugbetaald, volgens onze voorwaarden.\n\nMet vriendelijke groet,\n".($brand['name'] ?? 'Rebazz'), function ($m) use ($data, $orderNo) {
-                $m->to($data['email'])->subject('Bevestiging herroeping '.$orderNo);
-            });
         } catch (Throwable $e) {
             Log::error('Herroeping mailen mislukt', ['order' => $orderNo, 'error' => $e->getMessage()]);
 
             return response()->json(['error' => 'mail_failed', 'message' => 'Verzenden is niet gelukt. Mail ons direct op '.$owner.'.'], 502);
+        }
+
+        // Ontvangstbevestiging aan de klant: bewust alleen vaste tekst (geen vrije tekst uit het formulier), zodat het formulier
+        // niet als mailrelais voor willekeurige berichten kan dienen. Mislukt dit, dan is de herroeping toch ontvangen: geen foutmelding.
+        try {
+            Mail::raw("Beste klant,\n\nWij hebben uw herroeping van bestelling $orderNo ontvangen op $at.\n\nU ontvangt van ons binnen 24 uur het retouradres. Het aankoopbedrag wordt binnen 14 dagen na ontvangst van uw herroeping terugbetaald, volgens onze voorwaarden.\n\nMet vriendelijke groet,\n".($brand['name'] ?? 'Rebazz'), function ($m) use ($data, $orderNo) {
+                $m->to($data['email'])->subject('Bevestiging herroeping '.$orderNo);
+            });
+        } catch (Throwable $e) {
+            Log::warning('Bevestiging herroeping mailen mislukt', ['order' => $orderNo, 'error' => $e->getMessage()]);
         }
 
         return response()->json(['ok' => true]);
@@ -220,10 +229,51 @@ class ShopController extends Controller
     public function newsletter(Request $request): JsonResponse
     {
         $data = $request->validate(['email' => ['required', 'email:rfc', 'max:200'], 'lang' => ['nullable', 'string', 'max:5']]);
-        NewsletterSubscriber::updateOrCreate(['email' => strtolower($data['email'])], ['lang' => substr($data['lang'] ?? 'nl', 0, 2)]);
+        $email = strtolower($data['email']);
+        $lang = substr($data['lang'] ?? 'nl', 0, 2);
+        $sub = NewsletterSubscriber::updateOrCreate(['email' => $email], ['lang' => $lang]);
 
-        return response()->json(['ok' => true]);
+        // Dubbele opt-in: pas na klikken op de link in de bevestigingsmail is het adres actief. Het antwoord is altijd hetzelfde,
+        // zodat niet te achterhalen is of een adres al bestaat; per adres maximaal 3 bevestigingsmails per uur.
+        if (! $sub->confirmed_at && RateLimiter::attempt('newsletter-confirm:'.$email, 3, fn () => true, 3600)) {
+            $sub->update(['confirm_token' => Str::random(48)]);
+            $text = self::NEWSLETTER_MAIL[$lang] ?? self::NEWSLETTER_MAIL['en'];
+            $link = rtrim((string) config('app.url'), '/').'/api/newsletter/confirm?token='.$sub->confirm_token;
+            try {
+                Mail::raw($text[1]."\n\n".$link."\n\n".$text[2], fn ($m) => $m->to($email)->subject($text[0]));
+            } catch (Throwable $e) {
+                Log::error('Nieuwsbrief-bevestiging mailen mislukt', ['error' => $e->getMessage()]);
+            }
+        }
+
+        return response()->json(['ok' => true, 'confirm' => true]);
     }
+
+    /** Link uit de bevestigingsmail: zet de toestemming vast (tijdstip) en stuurt terug naar de winkel. */
+    public function confirmNewsletter(Request $request)
+    {
+        $token = (string) $request->query('token', '');
+        $origin = rtrim((string) config('shop.frontend_url'), '/');
+        $sub = strlen($token) === 48 ? NewsletterSubscriber::where('confirm_token', $token)->first() : null;
+        if ($sub) {
+            $sub->update(['confirmed_at' => $sub->confirmed_at ?? now(), 'confirm_token' => null]);
+
+            return redirect($origin.'/?newsletter=confirmed');
+        }
+
+        return redirect($origin.'/');
+    }
+
+    private const NEWSLETTER_MAIL = [
+        'nl' => ['Bevestig uw aanmelding', 'Klik op de link om uw aanmelding voor de Rebazz-nieuwsbrief te bevestigen:', 'Heeft u zich niet aangemeld? Dan kunt u deze e-mail negeren.'],
+        'en' => ['Confirm your subscription', 'Click the link to confirm your subscription to the Rebazz newsletter:', 'Did not sign up? You can ignore this email.'],
+        'de' => ['Anmeldung bestätigen', 'Klicken Sie auf den Link, um Ihre Anmeldung zum Rebazz-Newsletter zu bestätigen:', 'Sie haben sich nicht angemeldet? Dann ignorieren Sie diese E-Mail.'],
+        'fr' => ['Confirmez votre inscription', "Cliquez sur le lien pour confirmer votre inscription à la newsletter Rebazz :", "Vous ne vous êtes pas inscrit ? Ignorez cet e-mail."],
+        'es' => ['Confirme su suscripción', 'Haga clic en el enlace para confirmar su suscripción al boletín de Rebazz:', '¿No se suscribió? Ignore este correo.'],
+        'it' => ['Conferma l’iscrizione', 'Fai clic sul link per confermare l’iscrizione alla newsletter di Rebazz:', 'Non ti sei iscritto? Ignora questa e-mail.'],
+        'pl' => ['Potwierdź zapis', 'Kliknij link, aby potwierdzić zapis do newslettera Rebazz:', 'Nie zapisywałeś się? Zignoruj tę wiadomość.'],
+        'ar' => ['أكّد اشتراكك', 'اضغط على الرابط لتأكيد اشتراكك في نشرة Rebazz البريدية:', 'لم تشترك؟ يمكنك تجاهل هذه الرسالة.'],
+    ];
 
     /** Stripe meldt een geslaagde betaling: bestelling opslaan en bij CJ plaatsen. */
     public function stripeWebhook(Request $request, StripeGateway $stripe, OrderRecorder $recorder, CjService $cj): JsonResponse

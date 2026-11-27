@@ -2,7 +2,7 @@ import { useGSAP } from '@gsap/react';
 import gsap from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import { AnimatePresence, motion } from 'motion/react';
-import { useMemo, useRef, useState, type FormEvent } from 'react';
+import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import ShopChrome, { useShopUI } from '../components/ShopChrome';
 import { Icon, MButton, ProductVisual, Stars, useToast } from '../components/ui';
 import { api } from '../lib/api';
@@ -27,6 +27,18 @@ function HomeContent() {
   const [cat, setCat] = useState('Alle');
   const [email, setEmail] = useState('');
   const scope = useRef<HTMLDivElement>(null);
+
+  // Terug van de link in de bevestigingsmail van de nieuwsbrief (?newsletter=confirmed).
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('newsletter') === 'confirmed') {
+      toast(t('nl_confirmed'));
+      params.delete('newsletter');
+      const qs = params.toString();
+      window.history.replaceState(null, '', window.location.pathname + (qs ? '?' + qs : ''));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const products = catalog.products.filter(p => p.status === 'active');
   const cats = ['Alle', ...new Set(products.map(p => p.category))];
@@ -82,7 +94,7 @@ function HomeContent() {
 
   const subscribe = async (e: FormEvent) => {
     e.preventDefault();
-    try { await api.newsletter(email, locale); setEmail(''); toast(t('nl_ok')); }
+    try { await api.newsletter(email, locale); setEmail(''); toast(t('nl_check')); }
     catch { toast(t('co_error'), 'error'); }
   };
 
