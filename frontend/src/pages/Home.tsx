@@ -164,7 +164,9 @@ function HomeContent() {
                     whileHover={{ y: -4 }} transition={{ type: 'spring', stiffness: 320, damping: 28 }}>
                     <div className="media" onClick={() => openProduct(p)} role="button" tabIndex={0} onKeyDown={e => { if (e.key === 'Enter') openProduct(p); }} aria-label={pName(p)}>
                       {discount > 0 && <span className="tag">−{discount}%</span>}
-                      {/EU|VS/.test(p.warehouse) && <span className="tag fast">{t('fast')}</span>}
+                      {/EU|VS/.test(p.warehouse) && p.inStock !== false && <span className="tag fast">{t('fast')}</span>}
+                      {p.inStock === false && <span className="tag" style={{ background: 'var(--danger, #c0392b)', color: '#fff' }}>{t('sold_out')}</span>}
+                      {p.stockLeft ? <span className="tag" style={{ top: 'auto', bottom: 10 }}>{t('low_stock', { n: p.stockLeft })}</span> : null}
                       <ProductVisual p={p} />
                     </div>
                     <div className="body">
@@ -173,7 +175,7 @@ function HomeContent() {
                       {p.reviews > 0 && <div className="rating"><Stars rating={p.rating} /><span>{p.rating.toLocaleString(locale)} ({p.reviews})</span></div>}
                       <div className="price-row">
                         <span className="price">{money(p.price)}{p.compare && p.compare > p.price ? <small className="strike">{money(p.compare)}</small> : null}</span>
-                        <MButton className="btn btn-primary btn-sm" onClick={() => { addToCart(p.id); toast(t('added', { name: pName(p) })); }}><Icon name="plus" size={15} />{t('add_to_cart')}</MButton>
+                        <MButton className="btn btn-primary btn-sm" disabled={p.inStock === false} onClick={() => { addToCart(p.id); toast(t('added', { name: pName(p) })); }}><Icon name="plus" size={15} />{t('add_to_cart')}</MButton>
                       </div>
                     </div>
                   </motion.article>

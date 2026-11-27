@@ -9,7 +9,7 @@ class OrderItem extends Model
 {
     public $timestamps = false;
 
-    protected $fillable = ['order_id', 'product_id', 'sku', 'name', 'price', 'cost', 'qty', 'supplier', 'supplier_url'];
+    protected $fillable = ['order_id', 'product_id', 'sku', 'name', 'price', 'cost', 'qty', 'stock_deducted', 'supplier', 'supplier_url'];
 
     protected function casts(): array
     {

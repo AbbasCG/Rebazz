@@ -9,6 +9,7 @@ use App\Models\Setting;
 use App\Mail\OrderConfirmationMail;
 use App\Services\CjService;
 use App\Services\InvoiceService;
+use App\Services\StockService;
 use App\Services\OrderRecorder;
 use App\Services\Pricing;
 use App\Services\StripeGateway;
@@ -66,6 +67,10 @@ class ShopController extends Controller
         $country = strtoupper($data['country']);
         $q = $pricing->quote($data['items'], $country, $data['ship'] ?? 'standard');
         if (isset($q['error'])) {
+            if ($q['error'] === 'stock') {
+                return response()->json(['error' => 'stock', 'message' => 'Niet genoeg voorraad voor '.$q['product'].' (nog '.$q['available'].' beschikbaar).', 'product' => $q['product'], 'available' => $q['available']], 422);
+            }
+
             return response()->json(['error' => $q['error']], 422);
         }
         if (! $stripe->configured()) {
@@ -328,6 +333,7 @@ class ShopController extends Controller
             if ($order->status !== 'refunded') {
                 $order->update(['status' => 'refunded', 'cj_wait' => false]);
                 app(InvoiceService::class)->ensureCreditNote($order);
+                app(StockService::class)->restockIfUnshipped($order);
                 if ($order->cj_order_ids) {
                     $cj->alertOwner($order, 'Bestelling is terugbetaald in Stripe maar staat al bij CJ ('.$order->cj_order_ids.'). Annuleer de CJ-bestelling indien mogelijk.');
                 }

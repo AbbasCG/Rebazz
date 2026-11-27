@@ -251,6 +251,8 @@ export function ProductDetail({ p, onAdded }: { p: Product; onAdded: () => void 
               {p.compare && p.compare > p.price && <><span className="strike">{money(p.compare)}</span><span className="badge success plain">{t('save', { amount: money(p.compare - p.price) })}</span></>}
             </div>
             <p className="muted" style={{ fontSize: 12.5, marginTop: -10 }}>{zone.vat ? t('incl_vat') : t('excl_duties')}</p>
+            {p.inStock === false && <p className="badge danger plain" role="status" style={{ height: 'auto', padding: '8px 12px', whiteSpace: 'normal', alignSelf: 'flex-start' }}>{t('sold_out')}</p>}
+            {p.stockLeft ? <p className="badge warn plain" role="status" style={{ height: 'auto', padding: '8px 12px', whiteSpace: 'normal', alignSelf: 'flex-start' }}>{t('low_stock', { n: p.stockLeft })}</p> : null}
             <p>{pDesc(p)}</p>
             <ul className="features">{pFeatures(p).map(f => <li key={f}><Icon name="check" size={16} />{f}</li>)}</ul>
             {(p.manufacturer || p.euResponsible || p.safetyInfo) && (
@@ -275,10 +277,10 @@ export function ProductDetail({ p, onAdded }: { p: Product; onAdded: () => void 
               <div className="qty">
                 <button onClick={() => setQtyState(q => Math.max(1, q - 1))} aria-label={t('less')}><Icon name="minus" /></button>
                 <span>{qty}</span>
-                <button onClick={() => setQtyState(q => Math.min(20, q + 1))} aria-label={t('more')}><Icon name="plus" /></button>
+                <button onClick={() => setQtyState(q => Math.min(p.stockLeft ?? 20, q + 1))} aria-label={t('more')}><Icon name="plus" /></button>
               </div>
-              <MButton className="btn btn-primary btn-lg" style={{ flex: 1 }} onClick={() => { addToCart(p.id, qty); toast(t('added', { name: pName(p) })); onAdded(); }}>
-                <Icon name="cart" />{t('add_long')}
+              <MButton className="btn btn-primary btn-lg" style={{ flex: 1 }} disabled={p.inStock === false} onClick={() => { addToCart(p.id, qty); toast(t('added', { name: pName(p) })); onAdded(); }}>
+                <Icon name="cart" />{p.inStock === false ? t('sold_out') : t('add_long')}
               </MButton>
             </div>
             <p className="hint" style={{ display: 'flex', gap: 8, alignItems: 'center' }}><Icon name="lock" size={15} />{t('secure_pay')} · SKU {p.sku}</p>

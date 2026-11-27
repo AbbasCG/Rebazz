@@ -37,6 +37,9 @@ class Pricing
             if (! $p || $qty < 1 || $qty > 20) {
                 return ['error' => 'item'];
             }
+            if ($p->track_stock && $qty > max(0, (int) $p->stock)) {
+                return ['error' => 'stock', 'product' => $p->name, 'available' => max(0, (int) $p->stock)];
+            }
             $lines[] = ['product' => $p, 'qty' => $qty];
         }
         if (! $lines || count($lines) > 30) {

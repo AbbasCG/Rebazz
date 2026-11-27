@@ -74,7 +74,8 @@ export default function Checkout() {
       window.location.href = res.url;
     } catch (e) {
       setBusy(false);
-      setError(e instanceof ApiError && [0, 404, 405, 503].includes(e.status) ? t('co_notlive') : t('co_error'));
+      const stock = e instanceof ApiError && (e.data as { error?: string } | null)?.error === 'stock';
+      setError(stock ? t('co_stock') : e instanceof ApiError && [0, 404, 405, 503].includes(e.status) ? t('co_notlive') : t('co_error'));
     }
   };
 

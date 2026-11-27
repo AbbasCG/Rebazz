@@ -39,15 +39,23 @@ export function ShopProvider({ children, locale }: { children: ReactNode; locale
 
   useEffect(() => { save('rebazz.cart.v1', cart); }, [cart]);
 
+  /* Maximaal aantal per product: 20, en niet meer dan er op voorraad is (als het product voorraad bijhoudt). */
+  const maxFor = useCallback((id: string) => {
+    const p = catalog.products.find(x => x.id === id);
+    if (p && p.inStock === false) return 0;
+    return Math.min(20, p?.stockLeft ?? 20);
+  }, [catalog]);
   const addToCart = useCallback((id: string, qty = 1) => {
+    const max = maxFor(id);
+    if (max < 1) return;
     setCart(c => {
       const line = c.find(l => l.id === id);
-      return line ? c.map(l => (l.id === id ? { ...l, qty: Math.min(20, l.qty + qty) } : l)) : [...c, { id, qty }];
+      return line ? c.map(l => (l.id === id ? { ...l, qty: Math.min(max, l.qty + qty) } : l)) : [...c, { id, qty: Math.min(max, qty) }];
     });
-  }, []);
+  }, [maxFor]);
   const setQty = useCallback((id: string, qty: number) => {
-    setCart(c => (qty <= 0 ? c.filter(l => l.id !== id) : c.map(l => (l.id === id ? { ...l, qty: Math.min(20, qty) } : l))));
-  }, []);
+    setCart(c => (qty <= 0 ? c.filter(l => l.id !== id) : c.map(l => (l.id === id ? { ...l, qty: Math.min(maxFor(id) || l.qty, qty) } : l))));
+  }, [maxFor]);
 
   const value = useMemo<Shop>(() => ({
     catalog,

@@ -71,7 +71,7 @@ class FrontendController extends Controller
             '@context' => 'https://schema.org', '@type' => 'Product', 'name' => $p->name, 'description' => $desc, 'sku' => $p->sku,
             'brand' => ['@type' => 'Brand', 'name' => 'Rebazz'],
             'offers' => ['@type' => 'Offer', 'url' => $url, 'priceCurrency' => 'EUR', 'price' => number_format((float) $p->price, 2, '.', ''),
-                'availability' => 'https://schema.org/InStock', 'itemCondition' => 'https://schema.org/NewCondition'],
+                'availability' => (! $p->track_stock || $p->stock > 0) ? 'https://schema.org/InStock' : 'https://schema.org/OutOfStock', 'itemCondition' => 'https://schema.org/NewCondition'],
         ];
         if ($image) {
             $ld['image'] = $image;

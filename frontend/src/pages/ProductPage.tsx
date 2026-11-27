@@ -22,7 +22,7 @@ function Inner({ id }: { id: string }) {
       '@context': 'https://schema.org', '@type': 'Product', name: pName(p), description: desc, sku: p.sku, ...(image ? { image } : {}),
       brand: { '@type': 'Brand', name: 'Rebazz' },
       ...(p.reviews > 0 ? { aggregateRating: { '@type': 'AggregateRating', ratingValue: p.rating, reviewCount: p.reviews } } : {}),
-      offers: { '@type': 'Offer', url: origin + path, priceCurrency: 'EUR', price: p.price.toFixed(2), availability: 'https://schema.org/InStock', itemCondition: 'https://schema.org/NewCondition' }
+      offers: { '@type': 'Offer', url: origin + path, priceCurrency: 'EUR', price: p.price.toFixed(2), availability: p.inStock === false ? 'https://schema.org/OutOfStock' : 'https://schema.org/InStock', itemCondition: 'https://schema.org/NewCondition' }
     } : undefined
   });
   if (!p) return <NotFound />;

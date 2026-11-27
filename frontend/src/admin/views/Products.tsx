@@ -10,7 +10,7 @@ import { Modal, useConfirm } from '../parts';
 const margin = (p: Product) => (p.price ? (p.price - (p.cost ?? 0)) / p.price : 0);
 export const emptyProduct = (): Product => ({
   id: 'p' + Date.now().toString(36), sku: 'RB-' + Date.now().toString(36).toUpperCase().slice(-6), name: '', category: 'Tech', price: 0, compare: null, cost: 0, image: '', icon: 'package',
-  hue: Math.floor(Math.random() * 360), supplier: 'CJdropshipping', supplierUrl: '', cjVid: '', cjFrom: 'CN', cjLogistic: '', warehouse: 'China', days: [7, 12], stock: 100,
+  hue: Math.floor(Math.random() * 360), supplier: 'CJdropshipping', supplierUrl: '', cjVid: '', cjFrom: 'CN', cjLogistic: '', warehouse: 'China', days: [7, 12], stock: 100, trackStock: false,
   rating: 0, reviews: 0, sold: 0, status: 'draft', description: '', features: [], manufacturer: '', euResponsible: '', safetyInfo: ''
 });
 
@@ -64,7 +64,7 @@ export default function Products() {
             <AnimatePresence initial={false}>
               {list.map(p => (
                 <motion.tr key={p.id} layout initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-                  <td><div className="prod-cell"><ProductVisual p={p} /><div><b>{p.name}</b><span>{p.sku} · {p.category}{!p.image && <span style={{ color: 'var(--warn)' }}> · geen foto</span>}{!p.cjVid && <span style={{ color: 'var(--warn)' }}> · geen CJ-ID</span>}</span></div></div></td>
+                  <td><div className="prod-cell"><ProductVisual p={p} /><div><b>{p.name}</b><span>{p.sku} · {p.category}{p.trackStock && <span style={{ color: (p.stock ?? 0) <= 0 ? 'var(--danger)' : (p.stock ?? 0) <= 5 ? 'var(--warn)' : undefined }}> · {(p.stock ?? 0) <= 0 ? 'uitverkocht' : 'voorraad ' + p.stock}</span>}{!p.image && <span style={{ color: 'var(--warn)' }}> · geen foto</span>}{!p.cjVid && <span style={{ color: 'var(--warn)' }}> · geen CJ-ID</span>}</span></div></div></td>
                   <td>{p.supplier}{p.supplierUrl && <> <a href={p.supplierUrl} target="_blank" rel="noopener" title="Leverancierspagina"><Icon name="external" size={13} /></a></>}<br /><span className="muted" style={{ fontSize: 12 }}>{p.warehouse} · {p.days[0]}–{p.days[1]} d</span></td>
                   <td className="num">{eur(p.cost ?? 0)}</td>
                   <td className="num"><input className="input price-input" type="number" step="0.01" min="0" defaultValue={p.price.toFixed(2)} aria-label={'Verkoopprijs ' + p.name}
@@ -98,7 +98,7 @@ function ProductEditor({ initial, isNew, onClose, onSave }: { initial: Product; 
     <div className="field" style={full ? { gridColumn: '1/-1' } : undefined}>
       <label htmlFor={'e-' + String(k)}>{label}</label>
       <input className="input" id={'e-' + String(k)} type={type} step={type === 'number' ? '0.01' : undefined} min={type === 'number' ? 0 : undefined}
-        value={(p[k] as string | number | null) ?? ''} onChange={e => set(k, (type === 'number' ? (e.target.value === '' ? null : num(e.target.value)) : e.target.value) as Product[typeof k])} />
+        value={(p[k] as string | number | null) ?? ''} onChange={e => set(k, (type === 'number' ? (e.target.value === '' ? null : k === 'stock' ? Math.max(0, Math.round(num(e.target.value))) : num(e.target.value)) : e.target.value) as Product[typeof k])} />
       {hint && <span className="hint">{hint}</span>}
     </div>
   );
@@ -128,6 +128,8 @@ function ProductEditor({ initial, isNew, onClose, onSave }: { initial: Product; 
         {F({ label: 'CJ verzendmethode (optioneel)', k: 'cjLogistic', hint: 'Leeg = automatisch de goedkoopste.', full: true })}
         <div className="field"><label htmlFor="e-dmin">Levertijd min. (werkdagen)</label><input className="input" id="e-dmin" type="number" min={1} value={p.days[0]} onChange={e => set('days', [Math.max(1, parseInt(e.target.value) || 1), p.days[1]])} /></div>
         <div className="field"><label htmlFor="e-dmax">Levertijd max. (werkdagen)</label><input className="input" id="e-dmax" type="number" min={1} value={p.days[1]} onChange={e => set('days', [p.days[0], Math.max(1, parseInt(e.target.value) || 1)])} /></div>
+        <label className="check" style={{ gridColumn: '1/-1', display: 'flex', gap: 8, alignItems: 'center', fontSize: 14 }}><input type="checkbox" checked={!!p.trackStock} onChange={e => set('trackStock', e.target.checked)} />Voorraad bijhouden (niet doen bij dropshipping: de leverancier heeft de voorraad)</label>
+        {p.trackStock && F({ label: 'Voorraad (stuks)', k: 'stock', type: 'number', hint: 'Verkochte stuks worden automatisch afgeschreven; op 0 staat het product als "uitverkocht" in de winkel.', full: true })}
         <div className="field" style={{ gridColumn: '1/-1' }}><label htmlFor="e-desc">Beschrijving</label><textarea className="textarea" id="e-desc" rows={4} value={p.description} onChange={e => set('description', e.target.value)} /></div>
         <div className="field" style={{ gridColumn: '1/-1' }}><label htmlFor="e-feat">Kenmerken (één per regel)</label><textarea className="textarea" id="e-feat" rows={4} value={features} onChange={e => setFeatures(e.target.value)} /></div>
         <div style={{ gridColumn: '1/-1', borderTop: '1px solid var(--line)', paddingTop: 12 }}><b style={{ fontSize: 14 }}>Productveiligheid (GPSR)</b><p className="hint">Verplicht voor producten die u in de EU verkoopt: gegevens van de fabrikant en van een in de EU gevestigde verantwoordelijke. Deze worden bij het product getoond.</p></div>

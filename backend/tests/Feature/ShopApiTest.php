@@ -369,6 +369,82 @@ class ShopApiTest extends TestCase
         $this->assertStringStartsWith('%PDF', $res->getContent());
     }
 
+    public function test_checkout_respects_tracked_stock_but_ignores_untracked_products(): void
+    {
+        Product::whereKey('p1')->update(['track_stock' => true, 'stock' => 2]);
+        Product::whereKey('p2')->update(['track_stock' => false, 'stock' => 0]); // niet bijgehouden: voorraad 0 betekent niets
+
+        $res = $this->postJson('/api/checkout', ['items' => [['id' => 'p1', 'qty' => 3]], 'country' => 'NL'])->assertStatus(422);
+        $res->assertJsonPath('error', 'stock')->assertJsonPath('available', 2);
+        $this->assertStringContainsString('Niet genoeg voorraad', $res->json('message'));
+        $this->postJson('/api/checkout', ['items' => [['id' => 'p1', 'qty' => 2]], 'country' => 'NL'])->assertOk();
+        $this->postJson('/api/checkout', ['items' => [['id' => 'p2', 'qty' => 5]], 'country' => 'NL'])->assertOk();
+    }
+
+    public function test_paid_order_deducts_stock_once_and_catalog_shows_availability(): void
+    {
+        \Illuminate\Support\Facades\Mail::fake();
+        Product::whereKey('p1')->update(['track_stock' => true, 'stock' => 6]); // paidSession bestelt p1 × 2
+        $this->assertNull(collect($this->getJson('/api/catalog')->json('products'))->firstWhere('id', 'p1')['stockLeft']); // 6: geen "bijna op"
+
+        $this->stripe->session = $this->paidSession();
+        $this->webhookPaid();
+        $this->webhookPaid(); // dubbel event: niet nog eens afschrijven
+        $this->getJson('/api/orders/confirm?session_id=cs_test_abc123')->assertOk();
+
+        $this->assertSame(4, Product::find('p1')->stock);
+        $this->assertSame(2, Order::first()->items()->first()->stock_deducted);
+        $p1 = collect($this->getJson('/api/catalog')->json('products'))->firstWhere('id', 'p1'); // cache is ververst
+        $this->assertSame(4, $p1['stockLeft']);
+        $this->assertTrue($p1['inStock']);
+
+        Product::find('p1')->update(['stock' => 0]); // via het model (zoals het beheer): ververst de catalogus-cache
+        $p1 = collect($this->getJson('/api/catalog')->json('products'))->firstWhere('id', 'p1');
+        $this->assertFalse($p1['inStock']);
+        $this->assertNull($p1['stockLeft']);
+        $this->assertArrayNotHasKey('trackStock', $p1); // interne gegevens blijven uit de openbare catalogus
+    }
+
+    public function test_oversold_order_never_goes_negative_and_is_held_for_manual_handling(): void
+    {
+        config(['shop.cj.api_key' => 'CJ@api@key']);
+        Product::whereKey('p1')->update(['track_stock' => true, 'stock' => 1, 'cj_vid' => 'VID-AURA']); // koper betaalt voor 2 maar er is er nog 1
+        Http::fake();
+        $this->stripe->session = $this->paidSession();
+        $this->getJson('/api/orders/confirm?session_id=cs_test_abc123')->assertOk();
+
+        $o = Order::first();
+        $this->assertSame(1, Product::find('p1')->stock);          // niet afgeschreven, niet negatief
+        $this->assertSame(0, $o->items()->first()->stock_deducted);
+        $this->assertSame('manual', $o->cj_status);
+        $this->assertStringContainsString('Voorraad onvoldoende', $o->cj_error);
+        Http::assertNothingSent();                                   // niet automatisch bij CJ besteld
+    }
+
+    public function test_full_refund_restocks_only_orders_that_have_not_shipped(): void
+    {
+        \Illuminate\Support\Facades\Mail::fake();
+        Product::whereKey('p1')->update(['track_stock' => true, 'stock' => 6]);
+        $this->stripe->session = $this->paidSession();
+        $this->webhookPaid();
+        $this->assertSame(4, Product::find('p1')->stock);
+        $refund = ['type' => 'charge.refunded', 'data' => ['object' => ['payment_intent' => 'pi_123', 'refunded' => true]]];
+        $this->call('POST', '/api/stripe/webhook', [], [], [], ['HTTP_STRIPE_SIGNATURE' => 'ok', 'CONTENT_TYPE' => 'application/json'], json_encode($refund))->assertOk();
+        $this->assertSame(6, Product::find('p1')->stock);          // terug op voorraad
+        $this->call('POST', '/api/stripe/webhook', [], [], [], ['HTTP_STRIPE_SIGNATURE' => 'ok', 'CONTENT_TYPE' => 'application/json'], json_encode($refund))->assertOk();
+        $this->assertSame(6, Product::find('p1')->stock);          // niet dubbel terugboeken
+
+        // Verzonden bestelling: geen automatische terugboeking.
+        Product::whereKey('p1')->update(['stock' => 6]);
+        $this->stripe->session = $this->paidSession(['id' => 'cs_test_b', 'metadata' => ['order_no' => 'RB-TEST02'], 'payment_intent' => ['id' => 'pi_b', 'latest_charge' => ['refunded' => false]]]);
+        $this->webhookPaid('cs_test_b');
+        Order::where('order_no', 'RB-TEST02')->update(['step' => 2]);
+        $this->assertSame(4, Product::find('p1')->stock);
+        $refund['data']['object']['payment_intent'] = 'pi_b';
+        $this->call('POST', '/api/stripe/webhook', [], [], [], ['HTTP_STRIPE_SIGNATURE' => 'ok', 'CONTENT_TYPE' => 'application/json'], json_encode($refund))->assertOk();
+        $this->assertSame(4, Product::find('p1')->stock);
+    }
+
     public function test_refunded_orders_are_never_placed_at_cj(): void
     {
         config(['shop.cj.api_key' => 'CJ@api@key']);

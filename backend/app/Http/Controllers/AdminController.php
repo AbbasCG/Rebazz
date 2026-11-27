@@ -10,6 +10,7 @@ use App\Models\Setting;
 use App\Models\User;
 use App\Services\CjService;
 use App\Services\InvoiceService;
+use App\Services\StockService;
 use App\Services\StripeGateway;
 use App\Services\TaxService;
 use Illuminate\Http\JsonResponse;
@@ -106,6 +107,7 @@ class AdminController extends Controller
                     $stripe->refund($order->payment_intent_id);
                     $order->update(['status' => 'refunded', 'cj_wait' => false]);
                     app(InvoiceService::class)->ensureCreditNote($order);
+                    app(StockService::class)->restockIfUnshipped($order);
                     break;
                 case 'cj-order':
                     if ($order->cj_order_ids) {
@@ -168,6 +170,7 @@ class AdminController extends Controller
             'days' => ['required', 'array', 'size:2'],
             'days.*' => ['integer', 'between:1,90'],
             'stock' => ['nullable', 'integer', 'min:0', 'max:1000000'],
+            'trackStock' => ['sometimes', 'boolean'],
             'status' => ['required', 'in:active,draft'],
             'description' => ['nullable', 'string', 'max:5000'],
             'features' => ['nullable', 'array', 'max:12'],

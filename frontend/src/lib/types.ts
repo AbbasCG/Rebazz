@@ -50,6 +50,10 @@ export interface Product {
   warehouse: string;
   days: [number, number];
   stock?: number;
+  /** Voorraad: alleen als het product voorraad bijhoudt. inStock=false => uitverkocht; stockLeft = nog maar een paar stuks. */
+  trackStock?: boolean;
+  inStock?: boolean;
+  stockLeft?: number | null;
   rating: number;
   reviews: number;
   sold?: number;

@@ -47,7 +47,8 @@ class OrderRecorder
 
     private function create(array $s, array $md, ?string $piId, array $charge, array $cd, array $ship, array $addr, array $td, $items, $products): Order
     {
-        return DB::transaction(function () use ($s, $md, $piId, $charge, $cd, $ship, $addr, $td, $items, $products) {
+        $shortReason = null;
+        $order = DB::transaction(function () use ($s, $md, $piId, $charge, $cd, $ship, $addr, $td, $items, $products, &$shortReason) {
             $order = Order::create([
                 'order_no' => $md['order_no'] ?? ('RB-'.strtoupper(substr($s['id'], -8))),
                 'stripe_session_id' => $s['id'],
@@ -87,7 +88,23 @@ class OrderRecorder
                 ]);
             }
 
+            // Voorraad atomair afschrijven in dezelfde transactie. Ontbreekt er voorraad (twee kopers tegelijk voor het laatste
+            // stuk), dan wordt er niet automatisch bij CJ besteld: de eigenaar krijgt een melding en beslist (leveren of terugbetalen).
+            if ($order->status === 'paid') {
+                $short = app(StockService::class)->deduct($order);
+                if ($short) {
+                    $reason = 'Voorraad onvoldoende voor: '.implode('; ', $short).'. Lever later, of betaal terug.';
+                    $order->update(['cj_status' => 'manual', 'cj_error' => mb_substr($reason, 0, 450)]);
+                    $shortReason = $reason;
+                }
+            }
+
             return $order->load('items');
         });
+        if ($shortReason !== null) {
+            app(CjService::class)->alertOwner($order, $shortReason); // buiten de transactie: een mislukte mail mag de bestelling niet terugdraaien
+        }
+
+        return $order;
     }
 }

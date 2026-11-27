@@ -40,6 +40,10 @@ class DemoSeeder extends Seeder
             }
             $p->save();
         }
+        // Voorraadbeheer uitproberen: één product ruim op voorraad, één bijna op, één uitverkocht (de rest houdt geen voorraad bij).
+        foreach (['p1' => 50, 'p2' => 3, 'p3' => 0] as $id => $stock) {
+            Product::find($id)?->update(['track_stock' => true, 'stock' => $stock]);
+        }
         $products = Product::active()->orderBy('created_at')->get()->values();
         if ($products->count() < 3) {
             $this->command?->warn('Te weinig actieve producten voor demo-bestellingen.');
