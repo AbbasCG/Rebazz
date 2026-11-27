@@ -14,6 +14,23 @@ export class ApiError extends Error {
 const BASE = (import.meta.env.VITE_API_URL as string | undefined)?.replace(/\/$/, '') ?? '';
 const TOKEN_KEY = 'rebazz.admin.token';
 
+/* Standaardfoutmeldingen in de taal van de bezoeker (winkel). Het beheer is Nederlandstalig en gebruikt eigen teksten. */
+const MSG: Record<string, { offline: string; generic: string }> = {
+  nl: { offline: 'De server is niet bereikbaar.', generic: 'Er ging iets mis' },
+  en: { offline: 'The server cannot be reached.', generic: 'Something went wrong' },
+  de: { offline: 'Der Server ist nicht erreichbar.', generic: 'Etwas ist schiefgelaufen' },
+  fr: { offline: 'Le serveur est injoignable.', generic: 'Une erreur est survenue' },
+  es: { offline: 'No se puede acceder al servidor.', generic: 'Algo salió mal' },
+  it: { offline: 'Il server non è raggiungibile.', generic: 'Qualcosa è andato storto' },
+  pl: { offline: 'Serwer jest niedostępny.', generic: 'Coś poszło nie tak' },
+  ar: { offline: 'تعذّر الوصول إلى الخادم.', generic: 'حدث خطأ ما' }
+};
+const texts = (): { offline: string; generic: string } => {
+  let l = 'nl';
+  try { l = localStorage.getItem('rebazz.lang') ?? 'nl'; } catch { /* */ }
+  return MSG[l] ?? MSG.en;
+};
+
 export const adminToken = {
   get: (): string => { try { return sessionStorage.getItem(TOKEN_KEY) ?? ''; } catch { return ''; } },
   set: (t: string) => { try { sessionStorage.setItem(TOKEN_KEY, t); } catch { /* */ } },
@@ -28,11 +45,11 @@ async function request<T>(method: string, path: string, body?: unknown, admin = 
   try {
     res = await fetch(BASE + '/api' + path, { method, headers, body: body !== undefined ? JSON.stringify(body) : undefined });
   } catch {
-    throw new ApiError('De server is niet bereikbaar.', 0, null);
+    throw new ApiError(texts().offline, 0, null);
   }
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
-    const msg = (data && (data.message || data.error)) || 'Er ging iets mis (' + res.status + ')';
+    const msg = (data && (data.message || data.error)) || texts().generic + ' (' + res.status + ')';
     throw new ApiError(String(msg), res.status, data);
   }
   return data as T;
