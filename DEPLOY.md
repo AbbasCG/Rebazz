@@ -6,6 +6,8 @@ De Netlify-functies en de statische HTML-site zijn legacy en horen niet live te 
 ## 1. Server
 - PHP **8.4+** (extensies: pdo_pgsql, intl, mbstring, curl), PostgreSQL, webserver met document root `backend/public`.
 - Publiceer **nooit** de projectroot: alleen `backend/public`.
+- Serveer `/app/index.html` niet rechtstreeks (anders ontbreken CSP en beveiligingsheaders). Apache: staat al in `public/.htaccess`.
+  Nginx: `location = /app/index.html { rewrite ^ /index.php last; }` (en `try_files $uri /index.php?$query_string;` voor de rest).
 
 ## 2. Eerste keer
 ```bash

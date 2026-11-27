@@ -13,6 +13,10 @@
     RewriteCond %{HTTP:x-xsrf-token} .
     RewriteRule .* - [E=HTTP_X_XSRF_TOKEN:%{HTTP:X-XSRF-Token}]
 
+    # De gebouwde React-pagina nooit rechtstreeks serveren (dan missen CSP en andere beveiligingsheaders):
+    # altijd via Laravel (FrontendController). De bestanden in /app/assets blijven gewoon bereikbaar.
+    RewriteRule ^app/index\.html$ index.php [L]
+
     # Redirect Trailing Slashes If Not A Folder...
     RewriteCond %{REQUEST_FILENAME} !-d
     RewriteCond %{REQUEST_URI} (.+)/$
