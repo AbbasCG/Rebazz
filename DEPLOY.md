@@ -33,6 +33,7 @@ GPSR-gegevens en CJ-variant-ID in via het beheer (`/beheer`) voordat u ze active
 - Na het wijzigen van `ADMIN_PASSWORD` blijven bestaande beheer-tokens tot 7 dagen geldig. Trek ze direct in met:
   `php artisan tinker --execute="Laravel\Sanctum\PersonalAccessToken::query()->delete();"`
 - Nieuwsbriefaanmeldingen gebruiken dubbele opt-in: de bevestigingslink verwijst naar `APP_URL` (`/api/newsletter/confirm`), dus `APP_URL` moet het echte https-domein zijn en mail moet werken.
+- Productpagina's (`/product/<id>/<naam>`) en de sitemap (`/sitemap.xml`, dynamisch) gebruiken `FRONTEND_URL` voor canonical- en sitemap-adressen: zet die op het echte https-domein. Controleer na livegang `https://<domein>/sitemap.xml`, en dien die in bij Google Search Console. Pas de `Sitemap:`-regel in `backend/public/robots.txt` aan naar uw domein.
 - Houd `OWNER_ALERT_EMAIL` actueel: daar komen meldingen binnen over mislukte of vastgelopen CJ-bestellingen, terugbetalingen en betwistingen.
 
 ## 4. Stripe

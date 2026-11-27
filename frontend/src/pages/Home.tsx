@@ -8,6 +8,7 @@ import { Icon, MButton, ProductVisual, Stars, useToast } from '../components/ui'
 import { api } from '../lib/api';
 import { escapeHtml, useI18n } from '../lib/i18n';
 import { useShop } from '../lib/shop';
+import { productPath } from '../lib/slug';
 
 gsap.registerPlugin(ScrollTrigger, useGSAP);
 
@@ -168,7 +169,7 @@ function HomeContent() {
                     </div>
                     <div className="body">
                       <span className="cat">{category(p.category)}</span>
-                      <h3 onClick={() => openProduct(p)}>{pName(p)}</h3>
+                      <h3><a href={productPath(p)} onClick={e => { if (!e.metaKey && !e.ctrlKey && !e.shiftKey && e.button === 0) { e.preventDefault(); openProduct(p); } }} style={{ color: 'inherit', textDecoration: 'none' }}>{pName(p)}</a></h3>
                       {p.reviews > 0 && <div className="rating"><Stars rating={p.rating} /><span>{p.rating.toLocaleString(locale)} ({p.reviews})</span></div>}
                       <div className="price-row">
                         <span className="price">{money(p.price)}{p.compare && p.compare > p.price ? <small className="strike">{money(p.compare)}</small> : null}</span>

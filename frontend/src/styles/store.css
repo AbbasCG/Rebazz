@@ -171,7 +171,10 @@ section { scroll-margin-top: 90px; }
 .pdp { display: grid; grid-template-columns: 1fr 1fr; }
 .pdp .pv { min-height: 380px; min-width: 0; }
 .pdp-info { padding: 40px 36px; display: flex; flex-direction: column; gap: 16px; }
-.pdp-info h2 { font-family: var(--serif); font-weight: 500; font-size: 30px; }
+.pdp-info h1, .pdp-info h2 { font-family: var(--serif); font-weight: 500; font-size: 30px; }
+.product-page { padding-block: 24px 64px; }
+.product-page .crumbs { font-size: 13px; margin-bottom: 16px; display: flex; gap: 8px; align-items: center; }
+.product-detail { background: var(--surface); border-radius: 24px; overflow: hidden; box-shadow: var(--shadow-lg); }
 .pdp-price { display: flex; align-items: baseline; gap: 12px; }
 .pdp-price .price { font-size: 26px; }
 .pdp-info ul.features { list-style: none; padding: 0; margin: 0; display: grid; gap: 8px; }
@@ -207,7 +210,7 @@ section { scroll-margin-top: 90px; }
 
 /* Rechts-naar-links (Arabisch, Hebreeuws) */
 [dir="rtl"] body { font-family: 'Inter', 'Segoe UI', Tahoma, 'Noto Sans Arabic', sans-serif; }
-[dir="rtl"] .hero h1, [dir="rtl"] .section-head h2, [dir="rtl"] .newsletter h2, [dir="rtl"] .pdp-info h2 { font-family: 'Segoe UI', Tahoma, 'Noto Naskh Arabic', serif; font-weight: 600; letter-spacing: 0; }
+[dir="rtl"] .hero h1, [dir="rtl"] .section-head h2, [dir="rtl"] .newsletter h2, [dir="rtl"] .pdp-info h1, [dir="rtl"] .pdp-info h2 { font-family: 'Segoe UI', Tahoma, 'Noto Naskh Arabic', serif; font-weight: 600; letter-spacing: 0; }
 [dir="rtl"] .eyebrow, [dir="rtl"] .product-card .cat { letter-spacing: 0; }
 [dir="rtl"] .search-box .icon { left: auto; right: 12px; }
 [dir="rtl"] .search-box input { padding-left: 14px; padding-right: 36px; }

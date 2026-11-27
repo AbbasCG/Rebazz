@@ -7,6 +7,7 @@ import { SHARE } from '../lib/env';
 import { getConsent, onOpenCookieSettings, openCookieSettings, setConsent } from '../lib/consent';
 import { CURRENCIES, useI18n } from '../lib/i18n';
 import { quote, zoneFor } from '../lib/quote';
+import { productPath } from '../lib/slug';
 import { deliveryWindow, useShop } from '../lib/shop';
 import type { Product } from '../lib/types';
 import { Icon, MButton, Overlay, ProductVisual, Stars, ThemeToggle, useToast } from './ui';
@@ -18,7 +19,7 @@ export const useShopUI = () => useContext(UICtx);
 const spring = { type: 'spring' as const, stiffness: 380, damping: 36 };
 
 export default function ShopChrome({ children }: { children: ReactNode }) {
-  const [product, setProduct] = useState<Product | null>(null);
+  const navigate = useNavigate();
   const [cartOpen, setCartOpen] = useState(false);
   const [trackOpen, setTrackOpen] = useState(false);
   const [query, setQuery] = useState('');
@@ -26,23 +27,22 @@ export default function ShopChrome({ children }: { children: ReactNode }) {
 
   useEffect(() => { if (location.hash === '#volgen') setTrackOpen(true); }, [location.hash]);
   useEffect(() => {
-    const anyOpen = !!product || cartOpen || trackOpen;
+    const anyOpen = cartOpen || trackOpen;
     document.body.style.overflow = anyOpen ? 'hidden' : '';
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') { setProduct(null); setCartOpen(false); setTrackOpen(false); } };
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') { setCartOpen(false); setTrackOpen(false); } };
     window.addEventListener('keydown', onKey);
     return () => { window.removeEventListener('keydown', onKey); document.body.style.overflow = ''; };
-  }, [product, cartOpen, trackOpen]);
+  }, [cartOpen, trackOpen]);
 
-  const closeAll = () => { setProduct(null); setCartOpen(false); setTrackOpen(false); };
+  const closeAll = () => { setCartOpen(false); setTrackOpen(false); };
 
   return (
-    <UICtx.Provider value={{ openProduct: setProduct, openCart: () => setCartOpen(true), openTrack: () => setTrackOpen(true), query, setQuery }}>
+    <UICtx.Provider value={{ openProduct: (p: Product) => navigate(productPath(p)), openCart: () => setCartOpen(true), openTrack: () => setTrackOpen(true), query, setQuery }}>
       <Header />
       <main>{children}</main>
       <Footer />
-      <Overlay open={!!product || cartOpen || trackOpen} onClose={closeAll} />
+      <Overlay open={cartOpen || trackOpen} onClose={closeAll} />
       <AnimatePresence>{cartOpen && <CartDrawer key="cart" onClose={() => setCartOpen(false)} />}</AnimatePresence>
-      <AnimatePresence>{product && <ProductModal key={product.id} p={product} onClose={() => setProduct(null)} onAdded={() => { setProduct(null); setCartOpen(true); }} />}</AnimatePresence>
       <AnimatePresence>{trackOpen && <TrackModal key="track" onClose={() => setTrackOpen(false)} />}</AnimatePresence>
       <CookieBanner />
     </UICtx.Provider>
@@ -228,8 +228,8 @@ const GPSR_TEXT: Record<string, { title: string; maker: string; eu: string; safe
   ar: { title: 'سلامة المنتج والمصنِّع', maker: 'المصنِّع', eu: 'الجهة المسؤولة في الاتحاد الأوروبي', safety: 'معلومات السلامة' }
 };
 
-/* ---------- Productvenster ---------- */
-function ProductModal({ p, onClose, onAdded }: { p: Product; onClose: () => void; onAdded: () => void }) {
+/* ---------- Productdetail (gebruikt op de productpagina /product/:id) ---------- */
+export function ProductDetail({ p, onAdded }: { p: Product; onAdded: () => void }) {
   const { t, pName, pDesc, pFeatures, category, country: countryName, locale, lang } = useI18n();
   const { catalog, money, country, setCountry, addToCart } = useShop();
   const toast = useToast();
@@ -239,15 +239,12 @@ function ProductModal({ p, onClose, onAdded }: { p: Product; onClose: () => void
   const collator = new Intl.Collator(locale);
   const codes = catalog.zones.flatMap(z => z.countries).map(c => [c, countryName(c)] as const).sort((a, b) => collator.compare(a[1], b[1]));
   return (
-    <motion.div className="modal react" role="dialog" aria-modal="true" aria-label={pName(p)} onClick={e => { if (e.target === e.currentTarget) onClose(); }}
-      initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-      <motion.div className="modal-card" initial={{ y: 24, scale: 0.97 }} animate={{ y: 0, scale: 1 }} exit={{ y: 16, scale: 0.98 }} transition={spring}>
-        <button className="icon-btn modal-close" onClick={onClose} aria-label={t('close')}><Icon name="x" size={20} /></button>
+    <article className="product-detail">
         <div className="pdp">
           <ProductVisual p={p} />
           <div className="pdp-info">
             <span className="eyebrow">{category(p.category)}</span>
-            <h2>{pName(p)}</h2>
+            <h1>{pName(p)}</h1>
             {p.reviews > 0 && <div className="rating" style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: 13.5 }}><Stars rating={p.rating} /><span className="muted">{p.rating.toLocaleString(locale)} · {p.reviews} {t('reviews')}</span></div>}
             <div className="pdp-price">
               <span className="price">{money(p.price)}</span>
@@ -287,8 +284,7 @@ function ProductModal({ p, onClose, onAdded }: { p: Product; onClose: () => void
             <p className="hint" style={{ display: 'flex', gap: 8, alignItems: 'center' }}><Icon name="lock" size={15} />{t('secure_pay')} · SKU {p.sku}</p>
           </div>
         </div>
-      </motion.div>
-    </motion.div>
+    </article>
   );
 }
 

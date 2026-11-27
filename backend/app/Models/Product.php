@@ -50,6 +50,7 @@ class Product extends Model
     {
         $out = [
             'id' => $this->id,
+            'slug' => \Illuminate\Support\Str::slug($this->name),
             'sku' => $this->sku,
             'name' => $this->name,
             'category' => $this->category,

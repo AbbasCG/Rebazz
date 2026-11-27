@@ -19,6 +19,7 @@ const Admin = lazy(() => import('./admin/AdminApp'));
 const Checkout = lazy(() => import('./pages/Checkout'));
 const Thanks = lazy(() => import('./pages/Thanks'));
 const Legal = lazy(() => import('./pages/Legal'));
+const ProductPage = lazy(() => import('./pages/ProductPage'));
 const NotFound = lazy(() => import('./pages/NotFound'));
 
 function Page({ children }: { children: React.ReactNode }) {
@@ -34,11 +35,12 @@ function ShopRoutes() {
   const { locale, t } = useI18n();
   const path = location.pathname;
   const isAdmin = path.startsWith('/beheer');
-  const title = isAdmin ? '' // het beheer zet zijn eigen titel
+  const isProduct = path.startsWith('/product/'); // de productpagina zet zelf titel, canonical en gegevens
+  const title = isAdmin || isProduct ? '' // het beheer zet zijn eigen titel
     : path === '/checkout' ? `${t('co_title')} — Rebazz`
     : path === '/juridisch' ? `${t('f_legal')} — Rebazz`
     : 'Rebazz';
-  usePageMeta(path, title, !['/', '/juridisch'].includes(path));
+  usePageMeta(isProduct ? '' : path, title, !['/', '/juridisch'].includes(path));
   return (
     <ShopProvider locale={locale}>
       <AnimatePresence mode="wait">
@@ -46,6 +48,7 @@ function ShopRoutes() {
           <Route path="/" element={<Page><Home /></Page>} />
           <Route path="/checkout" element={<Page><Checkout /></Page>} />
           <Route path="/bedankt" element={<Page><Thanks /></Page>} />
+          <Route path="/product/:id/*" element={<Page><ProductPage /></Page>} />
           <Route path="/juridisch" element={<Page><Legal /></Page>} />
           <Route path="/beheer/*" element={<Suspense fallback={<div style={{ padding: 40 }}>Laden…</div>}><Admin /></Suspense>} />
           <Route path="*" element={<Page><NotFound /></Page>} />
