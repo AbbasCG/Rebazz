@@ -31,11 +31,11 @@ class OrderRecorder
         $td = $s['total_details'] ?? [];
 
         $items = collect(explode(',', (string) ($md['items'] ?? '')))->filter()->map(function ($pair) {
-            [$id, $qty] = array_pad(explode(':', $pair), 2, 1);
+            [$id, $qty, $variant] = array_pad(explode(':', $pair), 3, null); // id:aantal[:variant-id]
 
-            return ['id' => $id, 'qty' => max(1, (int) $qty)];
+            return ['id' => $id, 'v' => $variant ? (int) $variant : null, 'qty' => max(1, (int) $qty)];
         });
-        $products = Product::whereIn('id', $items->pluck('id'))->get()->keyBy('id');
+        $products = Product::with('variants')->whereIn('id', $items->pluck('id'))->get()->keyBy('id');
 
         try {
             return $this->create($s, $md, $piId, $charge, $cd, $ship, $addr, $td, $items, $products);
@@ -67,7 +67,7 @@ class OrderRecorder
                 'total' => ($s['amount_total'] ?? 0) / 100,
                 // Alleen vastleggen als Stripe Tax de btw echt berekend heeft; anders blijft het null en schat het btw-overzicht.
                 'tax_amount' => ($s['automatic_tax']['enabled'] ?? false) ? ($td['amount_tax'] ?? 0) / 100 : null,
-                'cost' => $items->sum(fn ($i) => ($products->get($i['id'])?->cost ?? 0) * $i['qty']),
+                'cost' => $items->sum(fn ($i) => ($products->get($i['id'])?->unitCost($products->get($i['id'])->variantById($i['v'])) ?? 0) * $i['qty']),
                 'payment_method' => $charge['payment_method_details']['type'] ?? '',
                 'ship_method' => $md['ship'] ?? 'standard',
                 'paid_at' => Carbon::createFromTimestamp($s['created'] ?? time()),
@@ -76,12 +76,15 @@ class OrderRecorder
             app(InvoiceService::class)->ensureInvoice($order);
             foreach ($items as $i) {
                 $p = $products->get($i['id']);
+                $v = $p?->variantById($i['v']);
                 $order->items()->create([
                     'product_id' => $p?->id,
-                    'sku' => $p?->sku ?? '',
+                    'variant_id' => $v?->id,
+                    'variant_label' => $v?->label ?? '',
+                    'sku' => ($v?->sku ?: $p?->sku) ?? '',
                     'name' => $p?->name ?? $i['id'],
-                    'price' => $p?->price ?? 0,
-                    'cost' => $p?->cost ?? 0,
+                    'price' => $p ? $p->unitPrice($v) : 0,
+                    'cost' => $p ? $p->unitCost($v) : 0,
                     'qty' => $i['qty'],
                     'supplier' => $p?->supplier ?? '',
                     'supplier_url' => $p?->supplier_url ?? '',

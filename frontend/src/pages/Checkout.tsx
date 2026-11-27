@@ -69,13 +69,13 @@ export default function Checkout() {
     if (!terms) { setTermsErr(true); return; }
     setBusy(true);
     try {
-      const items = q.lines.map(l => ({ id: l.product.id, qty: l.qty, name: pName(l.product) }));
+      const items = q.lines.map(l => ({ id: l.product.id, qty: l.qty, name: pName(l.product), ...(l.variant ? { v: l.variant.id } : {}) }));
       const res = await api.checkout({ items, country, ship, lang });
       window.location.href = res.url;
     } catch (e) {
       setBusy(false);
-      const stock = e instanceof ApiError && (e.data as { error?: string } | null)?.error === 'stock';
-      setError(stock ? t('co_stock') : e instanceof ApiError && [0, 404, 405, 503].includes(e.status) ? t('co_notlive') : t('co_error'));
+      const code = e instanceof ApiError ? (e.data as { error?: string } | null)?.error : undefined;
+      setError(code === 'stock' ? t('co_stock') : code === 'variant' ? t('co_variant') : e instanceof ApiError && [0, 404, 405, 503].includes(e.status) ? t('co_notlive') : t('co_error'));
     }
   };
 
@@ -126,13 +126,13 @@ export default function Checkout() {
           <aside className="co-section summary">
             <h2 style={{ justifyContent: 'space-between' }}><span>{t('co_your_order')}</span><Link to="/" style={{ fontSize: 13, fontWeight: 500 }}>{t('co_edit')}</Link></h2>
             {q.lines.map(l => (
-              <div className="line" key={l.product.id}>
-                <div className={'pv' + (l.product.image ? ' has-img' : '')} style={{ ['--h' as string]: l.product.hue }}>
-                  {l.product.image ? <img src={l.product.image} alt="" /> : <Icon name={l.product.icon} size={28} />}
+              <div className="line" key={l.key}>
+                <div className={'pv' + ((l.variant?.image || l.product.image) ? ' has-img' : '')} style={{ ['--h' as string]: l.product.hue }}>
+                  {(l.variant?.image || l.product.image) ? <img src={l.variant?.image || l.product.image} alt="" /> : <Icon name={l.product.icon} size={28} />}
                   <span className="q">{l.qty}</span>
                 </div>
-                <div><h4>{pName(l.product)}</h4><span className="muted" style={{ fontSize: 12.5 }}>{t('co_from_wh', { wh: whLabel(l.product.warehouse) })}</span></div>
-                <b style={{ fontSize: 14 }}>{money(l.product.price * l.qty)}</b>
+                <div><h4>{pName(l.product)}{l.variant ? ' — ' + l.variant.label : ''}</h4><span className="muted" style={{ fontSize: 12.5 }}>{t('co_from_wh', { wh: whLabel(l.product.warehouse) })}</span></div>
+                <b style={{ fontSize: 14 }}>{money(l.unit * l.qty)}</b>
               </div>
             ))}
             <div className="totals">

@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Mail\OrderStatusMail;
 use App\Models\Order;
 use App\Models\Product;
+use App\Models\ProductVariant;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -69,7 +70,7 @@ class CjService
         }
         $options = collect($this->call('POST', '/logistic/freightCalculate', [
             'startCountryCode' => $from, 'endCountryCode' => $to,
-            'products' => array_map(fn ($l) => ['quantity' => $l['qty'], 'vid' => $l['product']->cj_vid], $lines),
+            'products' => array_map(fn ($l) => ['quantity' => $l['qty'], 'vid' => $l['vid']], $lines),
         ]) ?? [])->filter(fn ($o) => ! empty($o['logisticName']))->sortBy(fn ($o) => (float) ($o['logisticPrice'] ?? 0));
         if ($options->isEmpty()) {
             throw new RuntimeException("CJ: geen verzendmethode beschikbaar van $from naar $to");
@@ -110,10 +111,16 @@ class CjService
     {
         $order->refresh();
         $order->loadMissing('items');
-        $lines = $order->items->map(fn ($i) => ['product' => Product::find($i->product_id), 'qty' => $i->qty])->all();
-        $missing = array_filter($lines, fn ($l) => ! $l['product'] || ! $l['product']->cj_vid);
+        // Per regel de juiste CJ-variant: die van de gekozen productvariant, anders die van het product.
+        $lines = $order->items->map(function ($i) {
+            $product = Product::find($i->product_id);
+            $variant = $i->variant_id ? ProductVariant::find($i->variant_id) : null;
+
+            return ['product' => $product, 'variant' => $variant, 'qty' => $i->qty, 'vid' => $variant?->cj_vid ?: $product?->cj_vid, 'label' => $i->variant_label];
+        })->all();
+        $missing = array_filter($lines, fn ($l) => ! $l['product'] || ! $l['vid']);
         if (! $this->enabled() || $missing) {
-            $reason = ! $this->enabled() ? 'CJ-koppeling niet ingesteld' : 'Geen CJ-variant-ID bij: '.implode(', ', array_map(fn ($l) => $l['product']?->name ?? '?', $missing));
+            $reason = ! $this->enabled() ? 'CJ-koppeling niet ingesteld' : 'Geen CJ-variant-ID bij: '.implode(', ', array_map(fn ($l) => ($l['product']?->name ?? '?').($l['label'] ? ' — '.$l['label'] : ''), $missing));
             $order->update(['cj_status' => 'manual', 'cj_error' => mb_substr($reason, 0, 450)]);
             $this->alertOwner($order, $reason);
 
@@ -158,7 +165,7 @@ class CjService
                     'logisticName' => $this->logistic($from, $order->country, $g),
                     'fromCountryCode' => $from,
                     'payType' => $autoPay ? 2 : 3,
-                    'products' => array_map(fn ($l) => ['vid' => $l['product']->cj_vid, 'quantity' => $l['qty']], $g),
+                    'products' => array_map(fn ($l) => ['vid' => $l['vid'], 'quantity' => $l['qty']], $g),
                 ];
                 if (in_array($order->country, self::EU, true) && ! in_array($from, self::EU, true)) {
                     $body['iossType'] = 3; // CJ IOSS: btw vooraf afgedragen

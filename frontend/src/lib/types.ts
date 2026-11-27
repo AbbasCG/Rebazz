@@ -30,6 +30,26 @@ export interface Review {
   rating?: number;
 }
 
+/** Keuze zoals maat of kleur: de namen en waarden worden door de eigenaar ingevoerd. */
+export interface ProductOption { name: string; values: string[] }
+
+/** Eén combinatie van opties (bijv. Zwart / M) met eigen prijs, voorraad en foto. */
+export interface ProductVariant {
+  id: number;
+  label: string;
+  values: Record<string, string>;
+  sku: string;
+  price: number;          // geldende prijs (eigen prijs of die van het product)
+  image: string;
+  inStock: boolean;
+  stockLeft: number | null;
+  /* Alleen in het beheer: */
+  ownPrice?: number | null;
+  cost?: number | null;
+  cjVid?: string;
+  stock?: number;
+}
+
 export interface Product {
   id: string;
   slug?: string;
@@ -40,6 +60,9 @@ export interface Product {
   compare: number | null;
   cost?: number;
   image: string;
+  images?: string[];
+  options?: ProductOption[];
+  variants?: ProductVariant[];
   icon: string;
   hue: number;
   supplier?: string;
@@ -77,6 +100,7 @@ export interface Catalog {
 export interface CartLine {
   id: string;
   qty: number;
+  v?: number; // variant-id (alleen bij producten met varianten)
 }
 
 export interface OrderItem {

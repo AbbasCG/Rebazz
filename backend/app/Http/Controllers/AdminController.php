@@ -145,7 +145,7 @@ class AdminController extends Controller
 
     public function products(): JsonResponse
     {
-        return response()->json(['products' => Product::orderBy('created_at')->orderBy('id')->get()->map(fn ($p) => $p->toApi(true))->values()]);
+        return response()->json(['products' => Product::with('variants')->orderBy('created_at')->orderBy('id')->get()->map(fn ($p) => $p->toApi(true))->values()]);
     }
 
     private function productRules(?Product $product = null): array
@@ -175,6 +175,24 @@ class AdminController extends Controller
             'description' => ['nullable', 'string', 'max:5000'],
             'features' => ['nullable', 'array', 'max:12'],
             'features.*' => ['string', 'max:200'],
+            // Extra foto's (https-adres of een eigen upload via /media/products/…) en keuzes zoals maat/kleur.
+            'images' => ['nullable', 'array', 'max:10'],
+            'images.*' => ['string', 'max:500', 'regex:/^(https:\/\/|\/media\/products\/)/'],
+            'options' => ['nullable', 'array', 'max:3'],
+            'options.*.name' => ['required', 'string', 'max:40'],
+            'options.*.values' => ['required', 'array', 'min:1', 'max:30'],
+            'options.*.values.*' => ['string', 'max:40'],
+            'variants' => ['nullable', 'array', 'max:100'],
+            'variants.*.id' => ['nullable', 'integer'],
+            'variants.*.label' => ['required', 'string', 'max:120'],
+            'variants.*.values' => ['nullable', 'array'],
+            'variants.*.values.*' => ['nullable', 'string', 'max:40'],
+            'variants.*.sku' => ['nullable', 'string', 'max:60'],
+            'variants.*.ownPrice' => ['nullable', 'numeric', 'min:0.5', 'max:100000'],
+            'variants.*.cost' => ['nullable', 'numeric', 'min:0'],
+            'variants.*.cjVid' => ['nullable', 'string', 'max:80'],
+            'variants.*.stock' => ['nullable', 'integer', 'min:0', 'max:1000000'],
+            'variants.*.image' => ['nullable', 'string', 'max:500', 'regex:/^(https:\/\/|\/media\/products\/)/'],
             // GPSR: verplicht voor actieve producten als SHOP_REQUIRE_GPSR=on (aanbevolen voor de livegang).
             'manufacturer' => [config('shop.require_gpsr') ? 'required_if:status,active' : 'nullable', 'nullable', 'string', 'max:300'],
             'euResponsible' => [config('shop.require_gpsr') ? 'required_if:status,active' : 'nullable', 'nullable', 'string', 'max:300'],
@@ -186,16 +204,22 @@ class AdminController extends Controller
     {
         $data = $request->validate($this->productRules());
         $product = Product::create(['id' => $data['id']] + Product::attributesFromApi($data));
+        if (! empty($data['variants'])) {
+            $product->syncVariants($data['variants']);
+        }
 
-        return response()->json(['product' => $product->toApi(true)], 201);
+        return response()->json(['product' => $product->fresh('variants')->toApi(true)], 201);
     }
 
     public function updateProduct(Request $request, Product $product): JsonResponse
     {
         $data = $request->validate($this->productRules($product));
         $product->update(Product::attributesFromApi($data));
+        if (array_key_exists('variants', $data)) { // meegestuurd (ook leeg) = het beheer bepaalt de varianten
+            $product->syncVariants($data['variants'] ?? []);
+        }
 
-        return response()->json(['product' => $product->fresh()->toApi(true)]);
+        return response()->json(['product' => $product->fresh('variants')->toApi(true)]);
     }
 
     public function destroyProduct(Product $product): JsonResponse

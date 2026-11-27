@@ -181,18 +181,19 @@ function CartDrawer({ onClose }: { onClose: () => void }) {
             </div>
             <AnimatePresence initial={false}>
               {q.lines.map(l => (
-                <motion.div key={l.product.id} className="cart-line" layout initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }}>
-                  <ProductVisual p={l.product} />
+                <motion.div key={l.key} className="cart-line" layout initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }}>
+                  <ProductVisual p={{ ...l.product, image: l.variant?.image || l.product.image }} />
                   <div>
                     <h4>{pName(l.product)}</h4>
-                    <span className="muted" style={{ fontSize: 13 }}>{money(l.product.price)}</span><br />
+                    {l.variant && <span className="muted" style={{ fontSize: 12.5, display: 'block' }}>{l.variant.label}</span>}
+                    <span className="muted" style={{ fontSize: 13 }}>{money(l.unit)}</span><br />
                     <div className="qty">
-                      <button onClick={() => setQty(l.product.id, l.qty - 1)} aria-label={t('less')}><Icon name="minus" /></button>
+                      <button onClick={() => setQty(l.product.id, l.qty - 1, l.variant?.id)} aria-label={t('less')}><Icon name="minus" /></button>
                       <span>{l.qty}</span>
-                      <button onClick={() => setQty(l.product.id, l.qty + 1)} aria-label={t('more')}><Icon name="plus" /></button>
+                      <button onClick={() => setQty(l.product.id, l.qty + 1, l.variant?.id)} aria-label={t('more')}><Icon name="plus" /></button>
                     </div>
                   </div>
-                  <b style={{ fontSize: 14 }}>{money(l.product.price * l.qty)}</b>
+                  <b style={{ fontSize: 14 }}>{money(l.unit * l.qty)}</b>
                 </motion.div>
               ))}
             </AnimatePresence>
@@ -228,12 +229,46 @@ const GPSR_TEXT: Record<string, { title: string; maker: string; eu: string; safe
   ar: { title: 'سلامة المنتج والمصنِّع', maker: 'المصنِّع', eu: 'الجهة المسؤولة في الاتحاد الأوروبي', safety: 'معلومات السلامة' }
 };
 
+/* Fotogalerij: hoofdfoto (die van de gekozen variant als die er is) met miniaturen van de extra foto's. */
+function Gallery({ p, variant }: { p: Product; variant?: { image: string } }) {
+  const list = [...new Set([variant?.image, p.image, ...(p.images ?? [])].filter((x): x is string => !!x))];
+  const [i, setI] = useState(0);
+  const current = list[Math.min(i, Math.max(0, list.length - 1))];
+  // Wisselt de gekozen variant van foto, dan laat de galerij die foto zien.
+  const vimg = variant?.image;
+  useEffect(() => { setI(0); }, [vimg]);
+  return (
+    <div className="gallery">
+      <ProductVisual p={{ ...p, image: current ?? '' }} />
+      {list.length > 1 && (
+        <div className="gallery-thumbs" role="tablist" aria-label="Foto's">
+          {list.map((src, n) => (
+            <button type="button" key={src} role="tab" aria-selected={n === i} className={n === i ? 'on' : ''} onClick={() => setI(n)}><img src={src} alt="" loading="lazy" /></button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 /* ---------- Productdetail (gebruikt op de productpagina /product/:id) ---------- */
 export function ProductDetail({ p, onAdded }: { p: Product; onAdded: () => void }) {
   const { t, pName, pDesc, pFeatures, category, country: countryName, locale, lang } = useI18n();
   const { catalog, money, country, setCountry, addToCart } = useShop();
   const toast = useToast();
   const [qty, setQtyState] = useState(1);
+  const variants = p.variants ?? [];
+  const options = p.options ?? [];
+  // Standaard de eerste leverbare variant voorselecteren; de bezoeker kan altijd wisselen.
+  const first = variants.find(v => v.inStock) ?? variants[0];
+  const [sel, setSel] = useState<Record<string, string>>(() => ({ ...(first?.values ?? {}) }));
+  const [picked, setPicked] = useState<number | undefined>(first?.id);
+  const variant = options.length
+    ? variants.find(v => options.every(o => v.values[o.name] === sel[o.name]))
+    : variants.find(v => v.id === picked);
+  const unit = variant?.price ?? p.price;
+  const soldOut = variant ? !variant.inStock : p.inStock === false;
+  const left = variant ? variant.stockLeft : p.stockLeft;
   const zone = zoneFor(catalog.zones, country) ?? catalog.zones[catalog.zones.length - 1];
   const days: [number, number] = [Math.max(p.days[0], zone.days[0]), Math.max(p.days[1], zone.days[1])];
   const collator = new Intl.Collator(locale);
@@ -241,18 +276,35 @@ export function ProductDetail({ p, onAdded }: { p: Product; onAdded: () => void 
   return (
     <article className="product-detail">
         <div className="pdp">
-          <ProductVisual p={p} />
+          <Gallery p={p} variant={variant} />
           <div className="pdp-info">
             <span className="eyebrow">{category(p.category)}</span>
             <h1>{pName(p)}</h1>
             {p.reviews > 0 && <div className="rating" style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: 13.5 }}><Stars rating={p.rating} /><span className="muted">{p.rating.toLocaleString(locale)} · {p.reviews} {t('reviews')}</span></div>}
             <div className="pdp-price">
-              <span className="price">{money(p.price)}</span>
-              {p.compare && p.compare > p.price && <><span className="strike">{money(p.compare)}</span><span className="badge success plain">{t('save', { amount: money(p.compare - p.price) })}</span></>}
+              <span className="price">{money(unit)}</span>
+              {!variants.length && p.compare && p.compare > p.price && <><span className="strike">{money(p.compare)}</span><span className="badge success plain">{t('save', { amount: money(p.compare - p.price) })}</span></>}
             </div>
             <p className="muted" style={{ fontSize: 12.5, marginTop: -10 }}>{zone.vat ? t('incl_vat') : t('excl_duties')}</p>
-            {p.inStock === false && <p className="badge danger plain" role="status" style={{ height: 'auto', padding: '8px 12px', whiteSpace: 'normal', alignSelf: 'flex-start' }}>{t('sold_out')}</p>}
-            {p.stockLeft ? <p className="badge warn plain" role="status" style={{ height: 'auto', padding: '8px 12px', whiteSpace: 'normal', alignSelf: 'flex-start' }}>{t('low_stock', { n: p.stockLeft })}</p> : null}
+            {variants.length > 0 && (options.length ? options.map(o => (
+              <fieldset key={o.name} className="opt-group">
+                <legend>{o.name}: <b>{sel[o.name]}</b></legend>
+                <div className="opt-values">
+                  {o.values.map(val => {
+                    const next = { ...sel, [o.name]: val };
+                    const match = variants.find(v => options.every(x => v.values[x.name] === next[x.name]));
+                    return <button type="button" key={val} className={'opt' + (sel[o.name] === val ? ' on' : '') + (match && !match.inStock ? ' out' : '')} aria-pressed={sel[o.name] === val} onClick={() => { setSel(next); setQtyState(1); }}>{val}</button>;
+                  })}
+                </div>
+              </fieldset>
+            )) : (
+              <fieldset className="opt-group">
+                <div className="opt-values">{variants.map(v => <button type="button" key={v.id} className={'opt' + (picked === v.id ? ' on' : '') + (!v.inStock ? ' out' : '')} aria-pressed={picked === v.id} onClick={() => { setPicked(v.id); setQtyState(1); }}>{v.label}</button>)}</div>
+              </fieldset>
+            ))}
+            {variants.length > 0 && !variant && <p className="badge warn plain" role="status" style={{ height: 'auto', padding: '8px 12px', whiteSpace: 'normal', alignSelf: 'flex-start' }}>{t('co_variant')}</p>}
+            {soldOut && <p className="badge danger plain" role="status" style={{ height: 'auto', padding: '8px 12px', whiteSpace: 'normal', alignSelf: 'flex-start' }}>{t('sold_out')}</p>}
+            {left ? <p className="badge warn plain" role="status" style={{ height: 'auto', padding: '8px 12px', whiteSpace: 'normal', alignSelf: 'flex-start' }}>{t('low_stock', { n: left })}</p> : null}
             <p>{pDesc(p)}</p>
             <ul className="features">{pFeatures(p).map(f => <li key={f}><Icon name="check" size={16} />{f}</li>)}</ul>
             {(p.manufacturer || p.euResponsible || p.safetyInfo) && (
@@ -277,13 +329,13 @@ export function ProductDetail({ p, onAdded }: { p: Product; onAdded: () => void 
               <div className="qty">
                 <button onClick={() => setQtyState(q => Math.max(1, q - 1))} aria-label={t('less')}><Icon name="minus" /></button>
                 <span>{qty}</span>
-                <button onClick={() => setQtyState(q => Math.min(p.stockLeft ?? 20, q + 1))} aria-label={t('more')}><Icon name="plus" /></button>
+                <button onClick={() => setQtyState(q => Math.min(left ?? 20, q + 1))} aria-label={t('more')}><Icon name="plus" /></button>
               </div>
-              <MButton className="btn btn-primary btn-lg" style={{ flex: 1 }} disabled={p.inStock === false} onClick={() => { addToCart(p.id, qty); toast(t('added', { name: pName(p) })); onAdded(); }}>
-                <Icon name="cart" />{p.inStock === false ? t('sold_out') : t('add_long')}
+              <MButton className="btn btn-primary btn-lg" style={{ flex: 1 }} disabled={soldOut || (variants.length > 0 && !variant)} onClick={() => { addToCart(p.id, qty, variant?.id); toast(t('added', { name: pName(p) })); onAdded(); }}>
+                <Icon name="cart" />{soldOut ? t('sold_out') : t('add_long')}
               </MButton>
             </div>
-            <p className="hint" style={{ display: 'flex', gap: 8, alignItems: 'center' }}><Icon name="lock" size={15} />{t('secure_pay')} · SKU {p.sku}</p>
+            <p className="hint" style={{ display: 'flex', gap: 8, alignItems: 'center' }}><Icon name="lock" size={15} />{t('secure_pay')} · SKU {variant?.sku || p.sku}</p>
           </div>
         </div>
     </article>

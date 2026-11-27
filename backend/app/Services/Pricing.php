@@ -29,7 +29,7 @@ class Pricing
             return ['error' => 'country'];
         }
         $ids = array_column($items, 'id');
-        $products = Product::active()->whereIn('id', $ids)->get()->keyBy('id');
+        $products = Product::active()->with('variants')->whereIn('id', $ids)->get()->keyBy('id');
         $lines = [];
         foreach ($items as $it) {
             $p = $products->get($it['id']);
@@ -37,15 +37,28 @@ class Pricing
             if (! $p || $qty < 1 || $qty > 20) {
                 return ['error' => 'item'];
             }
-            if ($p->track_stock && $qty > max(0, (int) $p->stock)) {
-                return ['error' => 'stock', 'product' => $p->name, 'available' => max(0, (int) $p->stock)];
+            $variant = null;
+            if ($p->hasVariants()) {
+                $variant = $p->variantById(isset($it['v']) ? (int) $it['v'] : null);
+                if (! isset($it['v']) || ! $it['v']) {
+                    return ['error' => 'variant', 'product' => $p->name];
+                }
+                if (! $variant) {
+                    return ['error' => 'item']; // variant bestaat niet (meer) of hoort niet bij dit product
+                }
+            } elseif (! empty($it['v'])) {
+                return ['error' => 'item'];
             }
-            $lines[] = ['product' => $p, 'qty' => $qty];
+            $available = $p->availableStock($variant);
+            if ($available !== null && $qty > $available) {
+                return ['error' => 'stock', 'product' => $p->name.($variant ? ' — '.$variant->label : ''), 'available' => $available];
+            }
+            $lines[] = ['product' => $p, 'variant' => $variant, 'qty' => $qty, 'unit' => $p->unitPrice($variant)];
         }
         if (! $lines || count($lines) > 30) {
             return ['error' => 'empty'];
         }
-        $subtotal = array_reduce($lines, fn ($s, $l) => $s + $l['product']->price * $l['qty'], 0.0);
+        $subtotal = array_reduce($lines, fn ($s, $l) => $s + $l['unit'] * $l['qty'], 0.0);
         $min = array_reduce($lines, fn ($m, $l) => max($m, $l['product']->days_min), $zone['days'][0]);
         $max = array_reduce($lines, fn ($m, $l) => max($m, $l['product']->days_max), $zone['days'][1]);
         $express = $shipMethod === 'express' && $zone['express'] > 0;

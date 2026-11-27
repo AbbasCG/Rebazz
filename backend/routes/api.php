@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\AdminController;
 use App\Http\Controllers\DocumentController;
+use App\Http\Controllers\MediaController;
 use App\Http\Controllers\ShopController;
 use Illuminate\Support\Facades\Route;
 
@@ -22,6 +23,7 @@ Route::post('/stripe/webhook', [ShopController::class, 'stripeWebhook'])->middle
 Route::post('/admin/login', [AdminController::class, 'login'])->middleware('throttle:5,1');
 
 Route::prefix('admin')->middleware(['auth:sanctum', 'abilities:admin'])->group(function () {
+    Route::post('/uploads', [MediaController::class, 'upload'])->middleware('throttle:60,1');
     Route::post('/logout', [AdminController::class, 'logout']);
     Route::get('/status', [AdminController::class, 'status']);
     Route::get('/orders', [AdminController::class, 'orders']);

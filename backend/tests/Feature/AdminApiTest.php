@@ -193,6 +193,103 @@ class AdminApiTest extends TestCase
         $this->assertStringStartsWith('%PDF', $this->get('/api/admin/orders/RB-OLD/credit-note', $h)->assertOk()->getContent());
     }
 
+    private function colorProduct(array $h, array $extra = []): array
+    {
+        $p = $this->getJson('/api/admin/products', $h)->json('products.0');
+        $p = array_merge($p, [
+            'options' => [['name' => 'Kleur', 'values' => ['Zwart', 'Wit']], ['name' => 'Maat', 'values' => ['M', 'L']]],
+            'images' => ['https://img.example/a.jpg', '/media/products/'.str_repeat('a', 32).'.jpg'],
+            'variants' => [
+                ['label' => 'Zwart / M', 'values' => ['Kleur' => 'Zwart', 'Maat' => 'M'], 'sku' => 'AUR-ZM', 'ownPrice' => null, 'cost' => null, 'cjVid' => 'VID-ZM', 'stock' => 5],
+                ['label' => 'Wit / L', 'values' => ['Kleur' => 'Wit', 'Maat' => 'L'], 'sku' => 'AUR-WL', 'ownPrice' => 89.5, 'cost' => 30, 'cjVid' => 'VID-WL', 'stock' => 0],
+            ],
+        ], $extra);
+
+        return $p;
+    }
+
+    public function test_variants_and_gallery_are_saved_synced_and_only_safe_fields_are_public(): void
+    {
+        $h = $this->auth();
+        $p = $this->colorProduct($h);
+        $saved = $this->putJson('/api/admin/products/'.$p['id'], $p, $h)->assertOk()->json('product');
+        $this->assertCount(2, $saved['variants']);
+        $this->assertEquals(30, $saved['variants'][1]['cost']);   // beheer ziet inkoop en CJ
+        $this->assertSame('VID-WL', $saved['variants'][1]['cjVid']);
+        $this->assertNull($saved['variants'][0]['ownPrice']);
+        $this->assertEquals($saved['price'], $saved['variants'][0]['price']); // zonder eigen prijs: prijs van het product
+        $this->assertEquals(89.5, $saved['variants'][1]['price']);
+
+        $pub = collect($this->getJson('/api/catalog')->json('products'))->firstWhere('id', $p['id']);
+        $this->assertCount(2, $pub['variants']);
+        $this->assertArrayNotHasKey('cost', $pub['variants'][1]);
+        $this->assertArrayNotHasKey('cjVid', $pub['variants'][1]);
+        $this->assertArrayNotHasKey('stock', $pub['variants'][1]);
+        $this->assertSame(['Kleur', 'Maat'], array_column($pub['options'], 'name'));
+        $this->assertCount(2, $pub['images']);
+
+        // Synchroniseren: eerste variant behouden (id), tweede weg, nieuwe erbij.
+        $keepId = $saved['variants'][0]['id'];
+        $p['variants'] = [
+            ['id' => $keepId, 'label' => 'Zwart / M (nieuw)', 'values' => ['Kleur' => 'Zwart', 'Maat' => 'M'], 'stock' => 9],
+            ['label' => 'Wit / M', 'values' => ['Kleur' => 'Wit', 'Maat' => 'M'], 'stock' => 1],
+        ];
+        $again = $this->putJson('/api/admin/products/'.$p['id'], $p, $h)->assertOk()->json('product');
+        $this->assertCount(2, $again['variants']);
+        $this->assertSame($keepId, $again['variants'][0]['id']);
+        $this->assertSame('Zwart / M (nieuw)', $again['variants'][0]['label']);
+        $this->assertSame(0, \App\Models\ProductVariant::where('label', 'Wit / L')->count());
+
+        $p['variants'] = [];
+        $this->putJson('/api/admin/products/'.$p['id'], $p, $h)->assertOk();
+        $this->assertSame(0, \App\Models\ProductVariant::where('product_id', $p['id'])->count());
+    }
+
+    public function test_variant_and_gallery_input_is_validated(): void
+    {
+        $h = $this->auth();
+        $p = $this->colorProduct($h);
+        $bad = $p;
+        $bad['images'] = ['javascript:alert(1)'];
+        $this->putJson('/api/admin/products/'.$p['id'], $bad, $h)->assertStatus(422)->assertJsonValidationErrors(['images.0']);
+        $bad = $p;
+        $bad['variants'][0]['label'] = '';
+        $this->putJson('/api/admin/products/'.$p['id'], $bad, $h)->assertStatus(422)->assertJsonValidationErrors(['variants.0.label']);
+        $bad = $p;
+        $bad['variants'][0]['stock'] = -1;
+        $this->putJson('/api/admin/products/'.$p['id'], $bad, $h)->assertStatus(422);
+        $bad = $p;
+        $bad['variants'][0]['label'] = '<b>Zwart</b>';
+        $ok = $this->putJson('/api/admin/products/'.$p['id'], $bad, $h)->assertOk()->json('product');
+        $this->assertSame('Zwart', $ok['variants'][0]['label']); // HTML wordt weggehaald
+    }
+
+    public function test_image_upload_accepts_real_images_only_and_serves_them_publicly(): void
+    {
+        \Illuminate\Support\Facades\Storage::fake('public');
+        $h = $this->auth();
+        $png = base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==');
+        $file = \Illuminate\Http\UploadedFile::fake()->createWithContent('foto.png', $png);
+
+        $this->postJson('/api/admin/uploads', ['image' => $file])->assertUnauthorized(); // zonder login geen uploads
+        $res = $this->post('/api/admin/uploads', ['image' => $file], $h + ['Accept' => 'application/json'])->assertCreated();
+        $url = $res->json('url');
+        $this->assertMatchesRegularExpression('#^/media/products/[a-z0-9]{32}\.png$#', $url);
+        \Illuminate\Support\Facades\Storage::disk('public')->assertExists('products/'.basename($url));
+
+        $img = $this->get($url)->assertOk();
+        $this->assertStringContainsString('immutable', $img->headers->get('Cache-Control'));
+        $this->assertSame('nosniff', $img->headers->get('X-Content-Type-Options'));
+
+        // Een PHP-script met .png-naam en een SVG worden geweigerd; onbekende of vreemde bestandsnamen geven 404.
+        $fake = \Illuminate\Http\UploadedFile::fake()->createWithContent('x.png', '<?php echo "boem"; ?>');
+        $this->post('/api/admin/uploads', ['image' => $fake], $h + ['Accept' => 'application/json'])->assertStatus(422);
+        $svg = \Illuminate\Http\UploadedFile::fake()->createWithContent('x.svg', '<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>');
+        $this->post('/api/admin/uploads', ['image' => $svg], $h + ['Accept' => 'application/json'])->assertStatus(422);
+        $this->get('/media/products/'.str_repeat('b', 32).'.png')->assertNotFound();
+        $this->get('/media/products/..%2F..%2F.env')->assertNotFound();
+    }
+
     public function test_negative_stock_is_rejected(): void
     {
         $h = $this->auth();

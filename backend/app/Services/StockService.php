@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\Order;
 use App\Models\Product;
+use App\Models\ProductVariant;
 use Illuminate\Support\Facades\Cache;
 
 /**
@@ -30,11 +31,16 @@ class StockService
                 continue;
             }
             // Eén UPDATE met voorwaarde: slaagt alleen als er nog genoeg is (geen race tussen lezen en schrijven).
-            $done = Product::whereKey($product->getKey())->where('track_stock', true)->where('stock', '>=', $item->qty)->decrement('stock', $item->qty);
+            // Heeft de bestelregel een variant, dan geldt de voorraad van die variant.
+            $variant = $item->variant_id ? ProductVariant::find($item->variant_id) : null;
+            $done = $variant
+                ? ProductVariant::whereKey($variant->getKey())->where('stock', '>=', $item->qty)->decrement('stock', $item->qty)
+                : Product::whereKey($product->getKey())->where('track_stock', true)->where('stock', '>=', $item->qty)->decrement('stock', $item->qty);
             if ($done === 1) {
                 $item->update(['stock_deducted' => $item->qty]);
             } else {
-                $short[] = $item->name.' (besteld '.$item->qty.', op voorraad '.max(0, (int) $product->fresh()->stock).')';
+                $left = $variant ? (int) $variant->fresh()->stock : (int) $product->fresh()->stock;
+                $short[] = $item->name.($item->variant_label ? ' — '.$item->variant_label : '').' (besteld '.$item->qty.', op voorraad '.max(0, $left).')';
             }
         }
         Cache::forget('shop.catalog'); // decrement() slaat de modelgebeurtenissen over
@@ -52,7 +58,9 @@ class StockService
         $order->loadMissing('items');
         foreach ($order->items as $item) {
             if ($item->stock_deducted > 0 && $item->product_id) {
-                Product::whereKey($item->product_id)->increment('stock', $item->stock_deducted);
+                $item->variant_id
+                    ? ProductVariant::whereKey($item->variant_id)->increment('stock', $item->stock_deducted)
+                    : Product::whereKey($item->product_id)->increment('stock', $item->stock_deducted);
                 $back += $item->stock_deducted;
                 $item->update(['stock_deducted' => 0]);
             }

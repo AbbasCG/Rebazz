@@ -82,7 +82,7 @@
     <tbody>
     @foreach($o->items as $i)
         <tr>
-            <td>{{ $i->name }}@if($i->sku)<br><span class="muted">SKU {{ $i->sku }}</span>@endif</td>
+            <td>{{ $i->name }}@if($i->variant_label) — {{ $i->variant_label }}@endif @if($i->sku)<br><span class="muted">SKU {{ $i->sku }}</span>@endif</td>
             <td class="r">{{ $i->qty }}</td>
             <td class="r">{{ $eur($i->price) }}</td>
             <td class="r">{{ $eur($i->price * $i->qty) }}</td>

@@ -70,7 +70,7 @@ class Order extends Model
             'country' => $this->country,
             'address' => $this->addressLine(),
             'items' => $this->items->map(fn (OrderItem $i) => [
-                'id' => (string) $i->product_id, 'sku' => $i->sku, 'name' => $i->name, 'price' => $i->price, 'cost' => $i->cost,
+                'id' => (string) $i->product_id, 'sku' => $i->sku, 'name' => $i->name.($i->variant_label ? ' — '.$i->variant_label : ''), 'price' => $i->price, 'cost' => $i->cost,
                 'qty' => $i->qty, 'supplier' => $i->supplier, 'supplierUrl' => $i->supplier_url,
             ])->values()->all(),
             'subtotal' => $this->subtotal,

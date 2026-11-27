@@ -36,7 +36,7 @@ class ShopController extends Controller
             'currency' => config('shop.currency'),
             'zones' => config('shop.zones'),
             'reviews' => Setting::get('reviews', []),
-            'products' => Product::active()->orderBy('created_at')->orderBy('id')->get()->map->toApi()->values()->all(),
+            'products' => Product::active()->with('variants')->orderBy('created_at')->orderBy('id')->get()->map->toApi()->values()->all(),
         ]);
 
         return response()->json($payload);
@@ -47,16 +47,18 @@ class ShopController extends Controller
         $data = $request->validate([
             'items' => ['required', 'array', 'min:1', 'max:30'],
             'items.*.id' => ['required', 'string', 'max:40'],
+            'items.*.v' => ['nullable', 'integer', 'min:1'],
             'items.*.qty' => ['required', 'integer', 'min:1', 'max:20'],
             'items.*.name' => ['nullable', 'string', 'max:200'],
             'country' => ['required', 'string', 'size:2'],
             'ship' => ['nullable', 'in:standard,express'],
             'lang' => ['nullable', 'string', Rule::in([...self::STRIPE_LOCALES, 'ar'])],
         ]);
-        // Dubbele regels met hetzelfde product samenvoegen, zodat het maximum van 20 per product niet te omzeilen is.
+        // Dubbele regels (zelfde product én variant) samenvoegen, zodat het maximum van 20 per product niet te omzeilen is.
         $merged = [];
         foreach ($data['items'] as $i) {
-            $merged[$i['id']] = ['id' => $i['id'], 'name' => $i['name'] ?? null, 'qty' => ($merged[$i['id']]['qty'] ?? 0) + $i['qty']];
+            $key = $i['id'].'#'.($i['v'] ?? 0);
+            $merged[$key] = ['id' => $i['id'], 'v' => $i['v'] ?? null, 'name' => $i['name'] ?? null, 'qty' => ($merged[$key]['qty'] ?? 0) + $i['qty']];
         }
         foreach ($merged as $m) {
             if ($m['qty'] > 20) {
@@ -67,6 +69,9 @@ class ShopController extends Controller
         $country = strtoupper($data['country']);
         $q = $pricing->quote($data['items'], $country, $data['ship'] ?? 'standard');
         if (isset($q['error'])) {
+            if ($q['error'] === 'variant') {
+                return response()->json(['error' => 'variant', 'message' => 'Kies eerst een variant (bijv. maat of kleur) van '.$q['product'].'.', 'product' => $q['product']], 422);
+            }
             if ($q['error'] === 'stock') {
                 return response()->json(['error' => 'stock', 'message' => 'Niet genoeg voorraad voor '.$q['product'].' (nog '.$q['available'].' beschikbaar).', 'product' => $q['product'], 'available' => $q['available']], 422);
             }
@@ -87,7 +92,7 @@ class ShopController extends Controller
         $orderNo = 'RB-'.strtoupper(base_convert((string) (int) (microtime(true) * 1000), 10, 36)).strtoupper(Str::random(2));
         $origin = rtrim((string) config('shop.frontend_url'), '/');
         $tax = config('shop.stripe.tax');
-        $packed = collect($q['lines'])->map(fn ($l) => $l['product']->id.':'.$l['qty'])->implode(',');
+        $packed = collect($q['lines'])->map(fn ($l) => $l['product']->id.':'.$l['qty'].($l['variant'] ? ':'.$l['variant']->id : ''))->implode(',');
         if (strlen($packed) > 480) { // Stripe-metadata: maximaal 500 tekens per waarde
             return response()->json(['error' => 'cart_too_large', 'message' => 'Te veel verschillende producten in één bestelling. Splits uw bestelling.'], 422);
         }
@@ -100,12 +105,12 @@ class ShopController extends Controller
                     'quantity' => $l['qty'],
                     'price_data' => array_filter([
                         'currency' => config('shop.currency'),
-                        'unit_amount' => (int) round($l['product']->price * 100),
+                        'unit_amount' => (int) round($l['unit'] * 100),
                         'tax_behavior' => $tax ? 'inclusive' : null,
                         'product_data' => array_filter([
-                            'name' => mb_substr($l['product']->name, 0, 120),
-                            'images' => str_starts_with($l['product']->image, 'https://') ? [$l['product']->image] : null,
-                            'metadata' => ['sku' => $l['product']->sku, 'product_id' => $l['product']->id],
+                            'name' => mb_substr($l['product']->name.($l['variant'] ? ' — '.$l['variant']->label : ''), 0, 120),
+                            'images' => ($img = $this->stripeImage($l['variant']?->image ?: $l['product']->image)) ? [$img] : null,
+                            'metadata' => array_filter(['sku' => ($l['variant']?->sku ?: $l['product']->sku), 'product_id' => $l['product']->id, 'variant_id' => $l['variant']?->id]),
                         ]),
                     ]),
                 ])->all(),
@@ -234,6 +239,21 @@ class ShopController extends Controller
         }
 
         return response()->json(['ok' => true]);
+    }
+
+    /** Stripe toont alleen absolute https-afbeeldingen; foto's uit het beheer (/media/...) worden omgezet naar het volledige adres. */
+    private function stripeImage(?string $image): ?string
+    {
+        if (! $image) {
+            return null;
+        }
+        if (str_starts_with($image, '/media/')) {
+            $origin = rtrim((string) config('shop.frontend_url'), '/');
+
+            return str_starts_with($origin, 'https://') ? $origin.$image : null;
+        }
+
+        return str_starts_with($image, 'https://') ? $image : null;
     }
 
     public function newsletter(Request $request): JsonResponse

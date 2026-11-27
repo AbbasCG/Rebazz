@@ -17,6 +17,46 @@ use Illuminate\Database\Seeder;
  */
 class DemoSeeder extends Seeder
 {
+    /** Effen kleurvlak als PNG (zonder GD): eenvoudige demo-foto's die via /media/products/… worden getoond. */
+    private function solidPng(int $r, int $g, int $b, int $size = 480): string
+    {
+        $row = "\x00".str_repeat(chr($r).chr($g).chr($b), $size);
+        $chunk = fn (string $type, string $data) => pack('N', strlen($data)).$type.$data.pack('N', crc32($type.$data));
+
+        return "\x89PNG\r\n\x1a\n"
+            .$chunk('IHDR', pack('NNCCCCC', $size, $size, 8, 2, 0, 0, 0))
+            .$chunk('IDAT', gzcompress(str_repeat($row, $size), 9))
+            .$chunk('IEND', '');
+    }
+
+    private function demoImage(int $r, int $g, int $b): string
+    {
+        $name = md5("demo-$r-$g-$b").'.png'; // 32 hex tekens + .png: voldoet aan de naamregels van /media/products
+        \Illuminate\Support\Facades\Storage::disk('public')->put('products/'.$name, $this->solidPng($r, $g, $b));
+
+        return '/media/products/'.$name;
+    }
+
+    /** Aura krijgt kleurvarianten (eigen prijs, voorraad en foto per kleur), de tafellamp een fotogalerij. */
+    private function demoVariantsAndGallery(): void
+    {
+        if ($p1 = Product::find('p1')) {
+            $p1->update(['options' => [['name' => 'Kleur', 'values' => ['Zwart', 'Wit', 'Blauw']]], 'track_stock' => true]);
+            $rows = [
+                ['Zwart', null, 10, $this->demoImage(40, 44, 52)],
+                ['Wit', 89.95, 3, $this->demoImage(225, 228, 232)],      // duurder en bijna op
+                ['Blauw', null, 0, $this->demoImage(70, 100, 200)],       // uitverkocht
+            ];
+            $p1->syncVariants(collect($rows)->map(fn ($r, $i) => [
+                'label' => $r[0], 'values' => ['Kleur' => $r[0]], 'sku' => 'RB-AUR-'.strtoupper(substr($r[0], 0, 3)), 'ownPrice' => $r[1],
+                'cjVid' => 'DEMO-VID-P1-'.strtoupper(substr($r[0], 0, 3)), 'stock' => $r[2], 'image' => $r[3],
+            ])->all());
+        }
+        if ($p2 = Product::find('p2')) {
+            $p2->update(['images' => [$this->demoImage(214, 160, 70), $this->demoImage(120, 90, 50), $this->demoImage(60, 50, 40)]]);
+        }
+    }
+
     public function run(): void
     {
         if (app()->isProduction()) {
@@ -44,6 +84,7 @@ class DemoSeeder extends Seeder
         foreach (['p1' => 50, 'p2' => 3, 'p3' => 0] as $id => $stock) {
             Product::find($id)?->update(['track_stock' => true, 'stock' => $stock]);
         }
+        $this->demoVariantsAndGallery();
         $products = Product::active()->orderBy('created_at')->get()->values();
         if ($products->count() < 3) {
             $this->command?->warn('Te weinig actieve producten voor demo-bestellingen.');

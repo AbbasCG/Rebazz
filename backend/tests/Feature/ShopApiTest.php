@@ -445,6 +445,96 @@ class ShopApiTest extends TestCase
         $this->assertSame(4, Product::find('p1')->stock);
     }
 
+    /** Aura (p1) met twee varianten: Zwart/M (prijs van product, voorraad 5) en Wit/L (eigen prijs € 89,50, eigen inkoop, voorraad 1). */
+    private function variantProduct(bool $track = false): array
+    {
+        $p = Product::find('p1');
+        $p->update(['track_stock' => $track]);
+        $a = $p->variants()->create(['label' => 'Zwart / M', 'values' => ['Kleur' => 'Zwart', 'Maat' => 'M'], 'sku' => 'AUR-ZM', 'cj_vid' => 'VID-ZM', 'stock' => 5, 'position' => 0]);
+        $b = $p->variants()->create(['label' => 'Wit / L', 'values' => ['Kleur' => 'Wit', 'Maat' => 'L'], 'sku' => 'AUR-WL', 'price' => 89.5, 'cost' => 30, 'cj_vid' => 'VID-WL', 'stock' => 1, 'position' => 1]);
+
+        return [$a, $b];
+    }
+
+    public function test_checkout_requires_a_variant_and_charges_the_variant_price(): void
+    {
+        [$a, $b] = $this->variantProduct();
+        $this->postJson('/api/checkout', ['items' => [['id' => 'p1', 'qty' => 1]], 'country' => 'NL'])->assertStatus(422)->assertJsonPath('error', 'variant');
+        $this->postJson('/api/checkout', ['items' => [['id' => 'p1', 'v' => 99999, 'qty' => 1]], 'country' => 'NL'])->assertStatus(422)->assertJsonPath('error', 'item');
+        $this->postJson('/api/checkout', ['items' => [['id' => 'p2', 'v' => $a->id, 'qty' => 1]], 'country' => 'NL'])->assertStatus(422); // variant hoort bij een ander product
+
+        $this->postJson('/api/checkout', ['items' => [['id' => 'p1', 'v' => $b->id, 'qty' => 2, 'name' => 'GRATIS']], 'country' => 'NL'])->assertOk();
+        $line = $this->stripe->lastParams['line_items'][0];
+        $this->assertSame(8950, $line['price_data']['unit_amount']);                 // eigen prijs van de variant, niet van het product
+        $this->assertSame('Aura draadloze koptelefoon met ANC — Wit / L', $line['price_data']['product_data']['name']);
+        $this->assertSame('AUR-WL', $line['price_data']['product_data']['metadata']['sku']);
+        $this->assertSame('p1:2:'.$b->id, $this->stripe->lastParams['metadata']['items']);
+
+        $this->postJson('/api/checkout', ['items' => [['id' => 'p1', 'v' => $a->id, 'qty' => 1]], 'country' => 'NL'])->assertOk();
+        $this->assertSame(7995, $this->stripe->lastParams['line_items'][0]['price_data']['unit_amount']); // zonder eigen prijs: productprijs
+    }
+
+    public function test_paid_order_keeps_variant_label_price_cost_and_sku_and_deducts_variant_stock(): void
+    {
+        \Illuminate\Support\Facades\Mail::fake();
+        [$a, $b] = $this->variantProduct(true);
+        $productStock = Product::find('p1')->stock;
+        $this->stripe->session = $this->paidSession(['metadata' => ['items' => 'p1:1:'.$a->id]]);
+        $this->postJson('/api/checkout', ['items' => [['id' => 'p1', 'v' => $b->id, 'qty' => 2]], 'country' => 'NL'])->assertStatus(422)->assertJsonPath('error', 'stock'); // Wit/L: nog 1
+        $this->webhookPaid();
+
+        $item = Order::first()->items()->first();
+        $this->assertSame($a->id, $item->variant_id);
+        $this->assertSame('Zwart / M', $item->variant_label);
+        $this->assertSame('AUR-ZM', $item->sku);
+        $this->assertEquals(79.95, $item->price);
+        $this->assertSame(4, $a->fresh()->stock);            // variantvoorraad, niet de productvoorraad
+        $this->assertSame(1, $item->stock_deducted);
+        $this->assertSame($productStock, Product::find('p1')->stock); // productvoorraad onaangeroerd
+
+        $refund = ['type' => 'charge.refunded', 'data' => ['object' => ['payment_intent' => 'pi_123', 'refunded' => true]]];
+        $this->call('POST', '/api/stripe/webhook', [], [], [], ['HTTP_STRIPE_SIGNATURE' => 'ok', 'CONTENT_TYPE' => 'application/json'], json_encode($refund))->assertOk();
+        $this->assertSame(5, $a->fresh()->stock);            // terug bij de juiste variant
+    }
+
+    public function test_variant_prices_and_cost_flow_into_the_order_and_the_cj_order_uses_the_variants_vid(): void
+    {
+        config(['shop.cj.api_key' => 'CJ@api@key']);
+        [$a, $b] = $this->variantProduct();
+        Product::whereKey('p1')->update(['cj_vid' => 'VID-PRODUCT', 'cj_from' => 'PL']);
+        Http::fake([
+            '*/authentication/getAccessToken' => Http::response(['code' => 200, 'result' => true, 'data' => ['accessToken' => 'TOK']]),
+            '*/logistic/freightCalculate' => Http::response(['code' => 200, 'result' => true, 'data' => [['logisticName' => 'CJPacket', 'logisticPrice' => '4']]]),
+            '*/shopping/order/createOrderV2' => Http::response(['code' => 200, 'result' => true, 'data' => ['orderId' => 'CJ-V']]),
+        ]);
+        $this->stripe->session = $this->paidSession(['amount_total' => 8950, 'metadata' => ['items' => 'p1:1:'.$b->id, 'country' => 'NL'], 'collected_information' => ['shipping_details' => ['address' => ['country' => 'NL', 'city' => 'Breda']]]]);
+        $this->getJson('/api/orders/confirm?session_id=cs_test_abc123')->assertOk();
+
+        $o = Order::first();
+        $this->assertEquals(30, $o->cost);                    // inkoop van de variant
+        $this->assertEquals(89.5, $o->items()->first()->price);
+        $this->assertSame('CJ-V', $o->cj_order_ids);
+        Http::assertSent(fn ($r) => str_contains($r->url(), 'createOrderV2') && $r['products'][0]['vid'] === 'VID-WL'); // niet het VID van het product
+        Http::assertSent(fn ($r) => str_contains($r->url(), 'freightCalculate') && $r['products'][0]['vid'] === 'VID-WL');
+        $this->assertStringContainsString('Wit / L', collect($o->load('items')->toApi()['items'])->first()['name']); // zichtbaar in het beheer
+    }
+
+    public function test_cj_order_for_a_variant_without_any_vid_is_held_for_manual_handling(): void
+    {
+        config(['shop.cj.api_key' => 'CJ@api@key']);
+        [$a] = $this->variantProduct();
+        $a->update(['cj_vid' => '']);
+        Product::whereKey('p1')->update(['cj_vid' => '']);
+        Http::fake();
+        $this->stripe->session = $this->paidSession(['metadata' => ['items' => 'p1:1:'.$a->id]]);
+        $this->getJson('/api/orders/confirm?session_id=cs_test_abc123')->assertOk();
+
+        $o = Order::first();
+        $this->assertSame('manual', $o->cj_status);
+        $this->assertStringContainsString('Zwart / M', $o->cj_error);
+        Http::assertNothingSent();
+    }
+
     public function test_refunded_orders_are_never_placed_at_cj(): void
     {
         config(['shop.cj.api_key' => 'CJ@api@key']);

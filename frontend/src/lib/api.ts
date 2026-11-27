@@ -74,6 +74,17 @@ export const api = {
     orderAction: (id: string, action: 'refund' | 'notify' | 'cj-order' | 'cj-check') =>
       request<{ order: Order; mailed?: boolean }>('POST', '/admin/orders/' + encodeURIComponent(id) + '/' + action, {}, true),
     cjSync: () => request<{ checked: number; changed: number }>('POST', '/admin/cj-sync', {}, true),
+    /** Productfoto uploaden (JPG, PNG of WebP, max. 4 MB). Geeft het adres terug, bijv. /media/products/abc.jpg */
+    upload: async (file: File): Promise<string> => {
+      const body = new FormData();
+      body.append('image', file);
+      let res: Response;
+      try { res = await fetch(BASE + '/api/admin/uploads', { method: 'POST', headers: { Accept: 'application/json', Authorization: 'Bearer ' + adminToken.get() }, body }); }
+      catch { throw new ApiError('De server is niet bereikbaar.', 0, null); }
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new ApiError(String(data.message ?? 'Uploaden mislukt (' + res.status + ')'), res.status, data);
+      return data.url as string;
+    },
     /** Factuur of creditnota (PDF) van een bestelling. */
     document: async (id: string, kind: 'invoice' | 'credit-note'): Promise<Blob> => {
       const res = await fetch(BASE + '/api/admin/orders/' + encodeURIComponent(id) + '/' + kind, { headers: { Authorization: 'Bearer ' + adminToken.get(), Accept: 'application/pdf' } });

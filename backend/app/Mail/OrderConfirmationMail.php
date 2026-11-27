@@ -62,7 +62,7 @@ class OrderConfirmationMail extends Mailable
 
         $rows = '';
         foreach ($o->items as $i) {
-            $rows .= '<tr><td style="padding:4px 0">'.e($i->name).' × '.(int) $i->qty.'</td><td style="padding:4px 0;text-align:end;white-space:nowrap">'.e($this->money($i->price * $i->qty)).'</td></tr>';
+            $rows .= '<tr><td style="padding:4px 0">'.e($i->name.($i->variant_label ? ' — '.$i->variant_label : '')).' × '.(int) $i->qty.'</td><td style="padding:4px 0;text-align:end;white-space:nowrap">'.e($this->money($i->price * $i->qty)).'</td></tr>';
         }
         $rows .= '<tr><td style="padding:4px 0">'.e($shipLbl).'</td><td style="padding:4px 0;text-align:end">'.e($this->money($o->shipping)).'</td></tr>';
         if ($o->discount > 0) {

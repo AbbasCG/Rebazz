@@ -174,8 +174,8 @@ function HomeContent() {
                       <h3><a href={productPath(p)} onClick={e => { if (!e.metaKey && !e.ctrlKey && !e.shiftKey && e.button === 0) { e.preventDefault(); openProduct(p); } }} style={{ color: 'inherit', textDecoration: 'none' }}>{pName(p)}</a></h3>
                       {p.reviews > 0 && <div className="rating"><Stars rating={p.rating} /><span>{p.rating.toLocaleString(locale)} ({p.reviews})</span></div>}
                       <div className="price-row">
-                        <span className="price">{money(p.price)}{p.compare && p.compare > p.price ? <small className="strike">{money(p.compare)}</small> : null}</span>
-                        <MButton className="btn btn-primary btn-sm" disabled={p.inStock === false} onClick={() => { addToCart(p.id); toast(t('added', { name: pName(p) })); }}><Icon name="plus" size={15} />{t('add_to_cart')}</MButton>
+                        <span className="price">{p.variants?.length && Math.min(...p.variants.map(v => v.price)) !== Math.max(...p.variants.map(v => v.price)) ? t('from_price', { price: money(Math.min(...p.variants.map(v => v.price))) }) : money(p.variants?.length ? p.variants[0].price : p.price)}{!p.variants?.length && p.compare && p.compare > p.price ? <small className="strike">{money(p.compare)}</small> : null}</span>
+                        <MButton className="btn btn-primary btn-sm" disabled={p.inStock === false} onClick={() => { if (p.variants?.length) { openProduct(p); return; } addToCart(p.id); toast(t('added', { name: pName(p) })); }}><Icon name={p.variants?.length ? 'arrow' : 'plus'} size={15} />{p.variants?.length ? t('choose_options') : t('add_to_cart')}</MButton>
                       </div>
                     </div>
                   </motion.article>

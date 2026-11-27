@@ -13,8 +13,8 @@ interface Shop {
   count: number;
   currency: string;
   country: string;
-  addToCart: (id: string, qty?: number) => void;
-  setQty: (id: string, qty: number) => void;
+  addToCart: (id: string, qty?: number, v?: number) => void;
+  setQty: (id: string, qty: number, v?: number) => void;
   clearCart: () => void;
   setCurrency: (c: string) => void;
   setCountry: (c: string) => void;
@@ -40,21 +40,23 @@ export function ShopProvider({ children, locale }: { children: ReactNode; locale
   useEffect(() => { save('rebazz.cart.v1', cart); }, [cart]);
 
   /* Maximaal aantal per product: 20, en niet meer dan er op voorraad is (als het product voorraad bijhoudt). */
-  const maxFor = useCallback((id: string) => {
+  const maxFor = useCallback((id: string, v?: number) => {
     const p = catalog.products.find(x => x.id === id);
+    const variant = v ? p?.variants?.find(x => x.id === v) : undefined;
+    if (variant) return variant.inStock ? Math.min(20, variant.stockLeft ?? 20) : 0;
     if (p && p.inStock === false) return 0;
     return Math.min(20, p?.stockLeft ?? 20);
   }, [catalog]);
-  const addToCart = useCallback((id: string, qty = 1) => {
-    const max = maxFor(id);
+  const addToCart = useCallback((id: string, qty = 1, v?: number) => {
+    const max = maxFor(id, v);
     if (max < 1) return;
     setCart(c => {
-      const line = c.find(l => l.id === id);
-      return line ? c.map(l => (l.id === id ? { ...l, qty: Math.min(max, l.qty + qty) } : l)) : [...c, { id, qty: Math.min(max, qty) }];
+      const line = c.find(l => l.id === id && l.v === v);
+      return line ? c.map(l => (l === line ? { ...l, qty: Math.min(max, l.qty + qty) } : l)) : [...c, { id, qty: Math.min(max, qty), ...(v ? { v } : {}) }];
     });
   }, [maxFor]);
-  const setQty = useCallback((id: string, qty: number) => {
-    setCart(c => (qty <= 0 ? c.filter(l => l.id !== id) : c.map(l => (l.id === id ? { ...l, qty: Math.min(maxFor(id) || l.qty, qty) } : l))));
+  const setQty = useCallback((id: string, qty: number, v?: number) => {
+    setCart(c => (qty <= 0 ? c.filter(l => !(l.id === id && l.v === v)) : c.map(l => (l.id === id && l.v === v ? { ...l, qty: Math.min(maxFor(id, v) || l.qty, qty) } : l))));
   }, [maxFor]);
 
   const value = useMemo<Shop>(() => ({
