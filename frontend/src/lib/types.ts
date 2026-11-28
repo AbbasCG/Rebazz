@@ -97,6 +97,18 @@ export interface Catalog {
   products: Product[];
 }
 
+/** Bestelling in het klantaccount. */
+export interface AccountOrder {
+  order_no: string; date: string; status: string; step: number; delayed: boolean; carrier: string; tracking: string; total: number;
+  items: { name: string; variant: string | null; qty: number; price: number }[];
+  invoiceUrl: string | null; anonymized: boolean; returnable: boolean; returnCount: number;
+}
+export interface AccountOrderDetail extends AccountOrder {
+  shipping: number; discount: number; country: string; returnDeadline: string;
+  returnItems: { id: number; name: string; qty: number; returnable: number }[];
+  returns: CustomerReturn[];
+}
+
 /** Retour zoals de klant die ziet. */
 export interface CustomerReturn {
   rma: string;

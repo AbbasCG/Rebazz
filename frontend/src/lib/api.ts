@@ -1,5 +1,5 @@
 /* Verbinding met de Laravel-API. In ontwikkeling stuurt Vite /api door naar Laravel. */
-import type { AdminReturn, Catalog, Order, Product, TrackedOrder } from './types';
+import type { AccountOrder, AccountOrderDetail, AdminReturn, Catalog, Order, Product, TrackedOrder } from './types';
 
 export class ApiError extends Error {
   status: number;
@@ -37,10 +37,18 @@ export const adminToken = {
   clear: () => { try { sessionStorage.removeItem(TOKEN_KEY); } catch { /* */ } }
 };
 
-async function request<T>(method: string, path: string, body?: unknown, admin = false): Promise<T> {
+export const customerToken = {
+  get: (): string => { try { return localStorage.getItem('rebazz.customer.token') ?? ''; } catch { return ''; } },
+  set: (t: string) => { try { localStorage.setItem('rebazz.customer.token', t); } catch { /* */ } },
+  clear: () => { try { localStorage.removeItem('rebazz.customer.token'); } catch { /* */ } }
+};
+
+/** admin = beheertoken (sessionStorage); customer = klanttoken (localStorage), alleen meegestuurd als de klant is ingelogd. */
+async function request<T>(method: string, path: string, body?: unknown, admin = false, customer = false): Promise<T> {
   const headers: Record<string, string> = { Accept: 'application/json' };
   if (body !== undefined) headers['Content-Type'] = 'application/json';
   if (admin && adminToken.get()) headers.Authorization = 'Bearer ' + adminToken.get();
+  else if (customer && customerToken.get()) headers.Authorization = 'Bearer ' + customerToken.get();
   let res: Response;
   try {
     res = await fetch(BASE + '/api' + path, { method, headers, body: body !== undefined ? JSON.stringify(body) : undefined });
@@ -58,7 +66,7 @@ async function request<T>(method: string, path: string, body?: unknown, admin = 
 export const api = {
   catalog: () => request<Catalog>('GET', '/catalog'),
   checkout: (body: { items: { id: string; qty: number; name: string }[]; country: string; ship: string; lang: string }) =>
-    request<{ url: string; order_no: string }>('POST', '/checkout', body),
+    request<{ url: string; order_no: string }>('POST', '/checkout', body, false, true), // ingelogd: e-mail vooraf ingevuld en bestelling aan het account gekoppeld
   confirm: (sessionId: string) => request<{ order_no: string; paid: boolean; total: number; email: string; country: string }>('GET', '/orders/confirm?session_id=' + encodeURIComponent(sessionId)),
   track: (orderNo: string, email: string) => request<TrackedOrder>('POST', '/orders/track', { order_no: orderNo, email }),
   /** Retour aanvragen (bestelnummer + e-mailadres als controle). Geeft de bijgewerkte retourgegevens terug. */
@@ -68,6 +76,28 @@ export const api = {
   privacyRequest: (email: string, type: 'export' | 'erase') => request<{ ok: boolean }>('POST', '/privacy/request', { email, type }),
   /** Wissen bevestigen met de ondertekende query (email, expires, signature) uit de e-mail. */
   privacyErase: (signedQuery: string) => request<PrivacyEraseResult>('POST', '/privacy/erase?' + signedQuery.replace(/^\?/, ''), {}),
+  account: {
+    requestCode: (email: string, lang: string) => request<{ ok: boolean }>('POST', '/account/login', { email, lang }),
+    verify: (email: string, code: string) => request<{ token: string; customer: { email: string; name: string } }>('POST', '/account/verify', { email, code }),
+    logout: () => request<{ ok: boolean }>('POST', '/account/logout', {}, false, true),
+    me: () => request<{ email: string; name: string; newsletter: boolean }>('GET', '/account/me', undefined, false, true),
+    update: (patch: { name?: string; newsletter?: boolean; lang?: string }) => request<{ email: string; name: string; newsletter: boolean }>('PATCH', '/account/me', patch, false, true),
+    orders: () => request<{ orders: AccountOrder[] }>('GET', '/account/orders', undefined, false, true),
+    order: (no: string) => request<AccountOrderDetail>('GET', '/account/orders/' + encodeURIComponent(no), undefined, false, true),
+    createReturn: (body: { order_no: string; items: { id: number; qty: number }[]; reason: string; comment: string }) =>
+      request<{ ok: boolean; rma: string } & AccountOrderDetail>('POST', '/account/returns', body, false, true),
+    wishlist: () => request<{ ids: string[] }>('GET', '/account/wishlist', undefined, false, true),
+    wishAdd: (id: string) => request<{ ids: string[] }>('POST', '/account/wishlist/' + encodeURIComponent(id), {}, false, true),
+    wishRemove: (id: string) => request<{ ids: string[] }>('DELETE', '/account/wishlist/' + encodeURIComponent(id), undefined, false, true),
+    wishMerge: (ids: string[]) => request<{ ids: string[] }>('POST', '/account/wishlist/merge', { ids }, false, true),
+    erase: () => request<PrivacyEraseResult & { account_deleted: boolean }>('POST', '/account/erase', {}, false, true),
+    /** Eigen gegevens als JSON-bestand (AVG). */
+    export: async (): Promise<Blob> => {
+      const res = await fetch(BASE + '/api/account/export', { headers: { Authorization: 'Bearer ' + customerToken.get(), Accept: 'application/json' } });
+      if (!res.ok) throw new ApiError('Export niet beschikbaar (' + res.status + ')', res.status, null);
+      return res.blob();
+    }
+  },
   withdrawal: (body: { name: string; email: string; order_no: string; items: string; message: string }) => request<{ ok: boolean }>('POST', '/withdrawal', body),
   newsletter: (email: string, lang: string) => request<{ ok: boolean }>('POST', '/newsletter', { email, lang }),
 

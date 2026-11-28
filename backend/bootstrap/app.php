@@ -18,6 +18,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->append(\App\Http\Middleware\SecurityHeaders::class);
         $middleware->alias([
             'abilities' => \Laravel\Sanctum\Http\Middleware\CheckAbilities::class,
+            'customer' => \App\Http\Middleware\EnsureCustomer::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

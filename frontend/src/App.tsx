@@ -8,6 +8,7 @@ import { SHARE } from './lib/env';
 const Router = SHARE ? MemoryRouter : BrowserRouter;
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { ToastProvider } from './components/ui';
+import { AuthProvider } from './lib/auth';
 import { I18nProvider, useI18n } from './lib/i18n';
 import { usePageMeta } from './lib/meta';
 import { ShopProvider } from './lib/shop';
@@ -21,6 +22,7 @@ const Thanks = lazy(() => import('./pages/Thanks'));
 const Legal = lazy(() => import('./pages/Legal'));
 const ProductPage = lazy(() => import('./pages/ProductPage'));
 const PrivacyRequest = lazy(() => import('./pages/PrivacyRequest'));
+const Account = lazy(() => import('./pages/Account'));
 const NotFound = lazy(() => import('./pages/NotFound'));
 
 function Page({ children }: { children: React.ReactNode }) {
@@ -52,6 +54,7 @@ function ShopRoutes() {
           <Route path="/product/:id/*" element={<Page><ProductPage /></Page>} />
           <Route path="/privacy-verzoek" element={<Page><PrivacyRequest mode="request" /></Page>} />
           <Route path="/privacy-verzoek/bevestigen" element={<Page><PrivacyRequest mode="confirm" /></Page>} />
+          <Route path="/account" element={<Page><Account /></Page>} />
           <Route path="/juridisch" element={<Page><Legal /></Page>} />
           <Route path="/beheer/*" element={<Suspense fallback={<div style={{ padding: 40 }}>Laden…</div>}><Admin /></Suspense>} />
           <Route path="*" element={<Page><NotFound /></Page>} />
@@ -69,7 +72,9 @@ export default function App() {
         <I18nProvider>
           <ToastProvider>
             <ErrorBoundary>
-              <ShopRoutes />
+              <AuthProvider>
+                <ShopRoutes />
+              </AuthProvider>
             </ErrorBoundary>
           </ToastProvider>
         </I18nProvider>

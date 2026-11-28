@@ -689,6 +689,43 @@ class ShopApiTest extends TestCase
         $this->assertNull(Order::first()->credit_note_number);
     }
 
+    public function test_checkout_by_a_logged_in_customer_locks_the_email_and_links_the_order_to_the_account(): void
+    {
+        \Illuminate\Support\Facades\Mail::fake();
+        $customer = \App\Models\Customer::create(['email' => 'account@example.nl']);
+        $token = $customer->createToken('shop', ['customer'])->plainTextToken;
+
+        // Zonder login: geen vastgezet e-mailadres en geen koppeling (de kassa werkt gewoon als gast).
+        $this->postJson('/api/checkout', ['items' => [['id' => 'p2', 'qty' => 1]], 'country' => 'NL'])->assertOk();
+        $this->assertArrayNotHasKey('customer_email', $this->stripe->lastParams);
+        $this->assertArrayNotHasKey('customer_id', $this->stripe->lastParams['metadata']);
+
+        $this->app['auth']->forgetGuards();
+        $this->postJson('/api/checkout', ['items' => [['id' => 'p2', 'qty' => 1]], 'country' => 'NL'], ['Authorization' => 'Bearer '.$token])->assertOk();
+        $this->assertSame('account@example.nl', $this->stripe->lastParams['customer_email']);
+        $this->assertSame($customer->id, $this->stripe->lastParams['metadata']['customer_id']);
+
+        // Een beheertoken telt niet als klant.
+        $admin = $this->postJson('/api/admin/login', ['password' => 'test-wachtwoord-123'])->assertOk()->json('token');
+        $this->app['auth']->forgetGuards();
+        $this->postJson('/api/checkout', ['items' => [['id' => 'p2', 'qty' => 1]], 'country' => 'NL'], ['Authorization' => 'Bearer '.$admin])->assertOk();
+        $this->assertArrayNotHasKey('customer_email', $this->stripe->lastParams);
+
+        // Na betaling hoort de bestelling bij het account, ook als Stripe een ander e-mailadres meldt.
+        $this->stripe->session = $this->paidSession(['metadata' => ['customer_id' => (string) $customer->id], 'customer_details' => ['email' => 'ander@example.nl']]);
+        $this->webhookPaid();
+        $this->assertSame($customer->id, Order::first()->customer_id);
+        $this->app['auth']->forgetGuards();
+        $mine = $this->getJson('/api/account/orders', ['Authorization' => 'Bearer '.$token])->assertOk()->json('orders');
+        $this->assertSame(['RB-TEST01'], array_column($mine, 'order_no'));
+
+        // Een niet-bestaand account-id in de metadata wordt genegeerd (geen fout).
+        Order::query()->delete();
+        $this->stripe->session = $this->paidSession(['metadata' => ['customer_id' => '99999']]);
+        $this->webhookPaid();
+        $this->assertNull(Order::first()->customer_id);
+    }
+
     public function test_refunded_orders_are_never_placed_at_cj(): void
     {
         config(['shop.cj.api_key' => 'CJ@api@key']);

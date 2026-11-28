@@ -51,6 +51,7 @@ class OrderRecorder
         $order = DB::transaction(function () use ($s, $md, $piId, $charge, $cd, $ship, $addr, $td, $items, $products, &$shortReason) {
             $order = Order::create([
                 'order_no' => $md['order_no'] ?? ('RB-'.strtoupper(substr($s['id'], -8))),
+                'customer_id' => isset($md['customer_id']) && \App\Models\Customer::whereKey($md['customer_id'])->exists() ? (int) $md['customer_id'] : null,
                 'stripe_session_id' => $s['id'],
                 'payment_intent_id' => $piId,
                 'livemode' => (bool) ($s['livemode'] ?? false),

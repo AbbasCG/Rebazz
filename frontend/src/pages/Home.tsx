@@ -4,6 +4,7 @@ import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import { AnimatePresence, motion } from 'motion/react';
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import ShopChrome, { useShopUI } from '../components/ShopChrome';
+import WishButton from '../components/WishButton';
 import { Icon, MButton, ProductVisual, Stars, useToast } from '../components/ui';
 import { api } from '../lib/api';
 import { escapeHtml, useI18n } from '../lib/i18n';
@@ -164,6 +165,7 @@ function HomeContent() {
                   <motion.article key={p.id} className="product-card" layout initial={{ opacity: 0, scale: 0.96 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.96 }}
                     whileHover={{ y: -4 }} transition={{ type: 'spring', stiffness: 320, damping: 28 }}>
                     <div className="media" onClick={() => openProduct(p)} role="button" tabIndex={0} onKeyDown={e => { if (e.key === 'Enter') openProduct(p); }} aria-label={pName(p)}>
+                      <WishButton id={p.id} />
                       {discount > 0 && <span className="tag">−{discount}%</span>}
                       {/EU|VS/.test(p.warehouse) && p.inStock !== false && <span className="tag fast">{t('fast')}</span>}
                       {p.inStock === false && <span className="tag" style={{ background: 'var(--danger, #c0392b)', color: '#fff' }}>{t('sold_out')}</span>}

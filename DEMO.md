@@ -33,6 +33,7 @@ Frontend ontwikkelen met live reload: `cd frontend && npm run dev` (http://local
 ## Proberen
 1. **Winkel:** http://127.0.0.1:8000 — producten bekijken (bij een product staat "Productveiligheid en fabrikant"), winkelwagen, taalwissel (ook Arabisch/RTL), cookiebanner, **Bestelling volgen** met de gegevens hierboven, herroepingsformulier onder `/juridisch` (mail gaat naar `storage/logs/laravel.log` zolang `MAIL_MAILER=log`).
 2. **Beheer:** http://127.0.0.1:8000/beheer — inloggen met `ADMIN_PASSWORD` uit uw `backend/.env`. Bekijk Bestellingen (filters), Producten (GPSR-velden, negatieve voorraad wordt geweigerd), Btw-overzicht, Instellingen.
+2a. **Klantaccount:** ga naar http://127.0.0.1:8000/account en log in met bijv. `demo1@example.com` (heeft bestelling RB-DEMO01 met retouren). De inlogcode staat in `backend/storage/logs/laravel.log` (zoek op "Uw inlogcode", want `MAIL_MAILER=log`). Op een productkaart zet het hartje het product op de verlanglijst; zonder login blijft die lokaal en na inloggen wordt hij samengevoegd. Draai na een update eerst `php artisan migrate`.
 3. **Vastgelopen bestelling:** zet in `.env` een willekeurige `CJ_API_KEY=test` en draai `php artisan shop:check-stuck`; de melding verschijnt in `storage/logs/laravel.log`.
 4. **Tests:** `php artisan test` (zet `DB_*` naar een aparte lege database `rebazz_test`).
 

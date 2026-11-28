@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Customer;
 use App\Models\NewsletterSubscriber;
 use App\Models\Order;
 use App\Models\Product;
@@ -91,6 +92,8 @@ class ShopController extends Controller
         }
 
         $lang = $data['lang'] ?? 'en';
+        $account = $request->user('sanctum'); // optioneel: de kassa werkt ook zonder login
+        $account = $account instanceof Customer && $account->tokenCan('customer') ? $account : null;
         $orderNo = 'RB-'.strtoupper(base_convert((string) (int) (microtime(true) * 1000), 10, 36)).strtoupper(Str::random(2));
         $origin = rtrim((string) config('shop.frontend_url'), '/');
         $tax = config('shop.stripe.tax');
@@ -131,7 +134,9 @@ class ShopController extends Controller
                 'allow_promotion_codes' => (bool) config('shop.allow_promotion_codes'),
                 'tax_id_collection' => ['enabled' => true],
                 'automatic_tax' => $tax ? ['enabled' => true] : null,
-                'metadata' => ['order_no' => $orderNo, 'items' => $packed, 'lang' => $lang, 'country' => $country, 'ship' => $q['express'] ? 'express' : 'standard'],
+                // Ingelogde klant: e-mail vastzetten (zodat de bestelling in het account verschijnt) en de bestelling aan het account koppelen.
+                'customer_email' => $account?->email,
+                'metadata' => array_filter(['order_no' => $orderNo, 'items' => $packed, 'lang' => $lang, 'country' => $country, 'ship' => $q['express'] ? 'express' : 'standard', 'customer_id' => $account?->id]),
                 'payment_intent_data' => ['description' => 'Rebazz '.$orderNo, 'metadata' => ['order_no' => $orderNo]],
                 'success_url' => $origin.'/bedankt?session_id={CHECKOUT_SESSION_ID}',
                 'cancel_url' => $origin.'/checkout',

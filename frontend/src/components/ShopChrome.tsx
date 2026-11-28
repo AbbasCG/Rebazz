@@ -10,7 +10,9 @@ import { quote, zoneFor } from '../lib/quote';
 import { productPath } from '../lib/slug';
 import { deliveryWindow, useShop } from '../lib/shop';
 import type { Product, TrackedOrder } from '../lib/types';
+import { useAuth } from '../lib/auth';
 import { ReturnPanel } from './ReturnPanel';
+import WishButton from './WishButton';
 import { Icon, MButton, Overlay, ProductVisual, Stars, ThemeToggle, useToast } from './ui';
 
 interface ShopUI { openProduct: (p: Product) => void; openCart: () => void; openTrack: () => void; query: string; setQuery: (q: string) => void }
@@ -53,6 +55,7 @@ export default function ShopChrome({ children }: { children: ReactNode }) {
 /* ---------- Kop ---------- */
 function Header() {
   const { t, lang, setLang, languages } = useI18n();
+  const { customer } = useAuth();
   const { currency, setCurrency, count, money } = useShop();
   const { openCart, openTrack, query, setQuery } = useShopUI();
   const [menu, setMenu] = useState(false);
@@ -91,6 +94,7 @@ function Header() {
               {Object.keys(CURRENCIES).map(c => <option key={c}>{c}</option>)}
             </select>
             <ThemeToggle label={t('theme')} />
+            {!SHARE && <Link className="icon-btn" to="/account" aria-label={t('acc_title')} title={customer ? customer.email : t('acc_title')}><Icon name="users" size={20} /></Link>}
             {!SHARE && <Link className="icon-btn" to="/beheer" id="adminLink" aria-label={t('admin')}><Icon name="dashboard" size={20} /></Link>}
             <MButton className="icon-btn" onClick={openCart} aria-label={t('cart_open')}>
               <Icon name="cart" size={20} />
@@ -281,7 +285,7 @@ export function ProductDetail({ p, onAdded }: { p: Product; onAdded: () => void 
           <Gallery p={p} variant={variant} />
           <div className="pdp-info">
             <span className="eyebrow">{category(p.category)}</span>
-            <h1>{pName(p)}</h1>
+            <div className="title-row"><h1>{pName(p)}</h1><WishButton id={p.id} /></div>
             {p.reviews > 0 && <div className="rating" style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: 13.5 }}><Stars rating={p.rating} /><span className="muted">{p.rating.toLocaleString(locale)} · {p.reviews} {t('reviews')}</span></div>}
             <div className="pdp-price">
               <span className="price">{money(unit)}</span>

@@ -298,3 +298,14 @@ section { scroll-margin-top: 90px; }
 .opt:hover { border-color: var(--ink); }
 .opt.on { border-color: var(--ink); background: var(--ink); color: var(--bg); }
 .opt.out { text-decoration: line-through; opacity: .55; }
+
+/* Verlanglijst-hartje */
+.wish-btn { display: inline-grid; place-items: center; width: 36px; height: 36px; border-radius: 50%; border: 1px solid var(--line); background: var(--surface); color: var(--ink-2, var(--ink)); cursor: pointer; }
+.wish-btn:hover { color: var(--ink); background: var(--surface-2); }
+.wish-btn.on { color: #c0392b; border-color: #c0392b; }
+.wish-btn.on svg { fill: currentColor; }
+.product-card .media .wish-btn { position: absolute; bottom: 10px; inset-inline-end: 10px; z-index: 2; width: 34px; height: 34px; }
+.pdp-info .title-row { display: flex; gap: 12px; align-items: flex-start; justify-content: space-between; }
+.acc-tabs { display: flex; gap: 6px; border-bottom: 1px solid var(--line); margin: 18px 0; flex-wrap: wrap; }
+.acc-tabs button { background: none; border: 0; padding: 10px 14px; font: inherit; cursor: pointer; color: var(--muted, inherit); border-bottom: 2px solid transparent; }
+.acc-tabs button[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--ink); font-weight: 600; }

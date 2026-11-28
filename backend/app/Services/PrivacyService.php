@@ -138,7 +138,7 @@ class PrivacyService
      * Periodieke opruiming (dagelijks): bestellingen na de bewaartermijn anonimiseren, niet-bevestigde nieuwsbriefaanmeldingen (30 dagen) verwijderen
      * en oude verzoeklogboeken (3 jaar) opruimen.
      *
-     * @return array{anonymized: int, newsletter_pending_deleted: int, requests_deleted: int}
+     * @return array{anonymized: int, newsletter_pending_deleted: int, requests_deleted: int, accounts_deleted: int}
      */
     public function runRetention(): array
     {
@@ -154,8 +154,15 @@ class PrivacyService
             });
         $pending = NewsletterSubscriber::whereNull('confirmed_at')->where('created_at', '<', now()->subDays(30))->delete();
         $requests = PrivacyRequest::where('requested_at', '<', now()->subYears(3))->delete();
+        // Klantaccounts: verlopen inlogcodes opruimen en accounts die 3 jaar niet zijn gebruikt verwijderen (opslagbeperking).
+        \App\Models\LoginCode::where('expires_at', '<', now()->subDay())->delete();
+        $stale = \App\Models\Customer::where(fn ($q) => $q->where('last_login_at', '<', now()->subYears(3))->orWhere(fn ($n) => $n->whereNull('last_login_at')->where('created_at', '<', now()->subYears(3))))->pluck('id');
+        if ($stale->isNotEmpty()) {
+            DB::table('personal_access_tokens')->where('tokenable_type', \App\Models\Customer::class)->whereIn('tokenable_id', $stale)->delete();
+            \App\Models\Customer::whereIn('id', $stale)->delete();
+        }
 
-        return ['anonymized' => $anonymized, 'newsletter_pending_deleted' => $pending, 'requests_deleted' => $requests];
+        return ['anonymized' => $anonymized, 'newsletter_pending_deleted' => $pending, 'requests_deleted' => $requests, 'accounts_deleted' => $stale->count()];
     }
 
     public function log(string $email, string $type, string $source, array $result = [], bool $completed = true): PrivacyRequest

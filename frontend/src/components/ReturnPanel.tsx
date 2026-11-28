@@ -7,7 +7,11 @@ import { Icon, MButton } from './ui';
 const REASONS = ['defective', 'damaged', 'wrong_item', 'not_as_described', 'changed_mind', 'other'] as const;
 
 /** Retouren in het venster "Bestelling volgen": bestaande retouren met status, en een formulier om een nieuwe aan te vragen. */
-export function ReturnPanel({ order, code, email, onChange }: { order: TrackedOrder; code: string; email: string; onChange: (patch: Partial<TrackedOrder>) => void }) {
+export function ReturnPanel({ order, code, email, onChange, submitReturn }: {
+  order: TrackedOrder; code: string; email: string; onChange: (patch: Partial<TrackedOrder>) => void;
+  /** Ingelogde klant: eigen aanroep (geen bestelnummer/e-mail nodig). */
+  submitReturn?: (body: { items: { id: number; qty: number }[]; reason: string; comment: string }) => Promise<{ rma: string } & Pick<TrackedOrder, 'returnable' | 'returnDeadline' | 'items' | 'returns'>>;
+}) {
   const { t, locale } = useI18n();
   const [open, setOpen] = useState(false);
   const [qty, setQty] = useState<Record<number, number>>({});
@@ -24,7 +28,7 @@ export function ReturnPanel({ order, code, email, onChange }: { order: TrackedOr
     if (!items.length) { setError(t('rt_pick_one')); return; }
     setBusy(true); setError('');
     try {
-      const res = await api.createReturn({ order_no: code, email, items, reason, comment });
+      const res = submitReturn ? await submitReturn({ items, reason, comment }) : await api.createReturn({ order_no: code, email, items, reason, comment });
       onChange({ returnable: res.returnable, returnDeadline: res.returnDeadline, items: res.items, returns: res.returns });
       setSent(t('rt_sent', { rma: res.rma }));
       setOpen(false); setQty({}); setComment('');

@@ -1,6 +1,8 @@
 <?php
 
+use App\Http\Controllers\AccountController;
 use App\Http\Controllers\AdminController;
+use App\Http\Controllers\CustomerAuthController;
 use App\Http\Controllers\DocumentController;
 use App\Http\Controllers\MediaController;
 use App\Http\Controllers\PrivacyController;
@@ -20,6 +22,23 @@ Route::post('/privacy/request', [PrivacyController::class, 'request'])->middlewa
 Route::get('/privacy/export', [PrivacyController::class, 'export'])->middleware(['signed', 'throttle:10,1,privacy-export'])->name('privacy.export');
 Route::post('/privacy/erase', [PrivacyController::class, 'erase'])->middleware(['signed', 'throttle:10,1,privacy-erase'])->name('privacy.erase');
 Route::get('/newsletter/unsubscribe', [PrivacyController::class, 'unsubscribe'])->middleware(['signed', 'throttle:30,1,nl-unsub'])->name('newsletter.unsubscribe');
+// Klantaccount (zonder wachtwoord): inlogcode per e-mail; alles daarna onder /account met een token met het recht "customer".
+Route::post('/account/login', [CustomerAuthController::class, 'requestCode'])->middleware('throttle:30,60,acct-login');
+Route::post('/account/verify', [CustomerAuthController::class, 'verify'])->middleware('throttle:20,60,acct-verify');
+Route::middleware(['auth:sanctum', 'abilities:customer', 'customer'])->prefix('account')->group(function () {
+    Route::post('/logout', [CustomerAuthController::class, 'logout']);
+    Route::get('/me', [AccountController::class, 'show']);
+    Route::patch('/me', [AccountController::class, 'update']);
+    Route::get('/orders', [AccountController::class, 'orders']);
+    Route::get('/orders/{order}', [AccountController::class, 'order']);
+    Route::post('/returns', [AccountController::class, 'createReturn'])->middleware('throttle:10,10,acct-returns');
+    Route::get('/wishlist', [AccountController::class, 'wishlist']);
+    Route::post('/wishlist/merge', [AccountController::class, 'wishlistMerge']);
+    Route::post('/wishlist/{product}', [AccountController::class, 'wishlistAdd']);
+    Route::delete('/wishlist/{product}', [AccountController::class, 'wishlistRemove']);
+    Route::get('/export', [AccountController::class, 'export'])->middleware('throttle:10,60,acct-export');
+    Route::post('/erase', [AccountController::class, 'erase'])->middleware('throttle:5,60,acct-erase');
+});
 Route::post('/withdrawal', [ShopController::class, 'withdrawal'])->middleware('throttle:5,10,withdrawal');
 Route::get('/newsletter/confirm', [ShopController::class, 'confirmNewsletter'])->middleware('throttle:30,1,nl-confirm');
 Route::post('/newsletter', [ShopController::class, 'newsletter'])->middleware('throttle:5,1,newsletter');

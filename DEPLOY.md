@@ -54,6 +54,7 @@ GPSR-gegevens en CJ-variant-ID in via het beheer (`/beheer`) voordat u ze active
 
 ## 6. E-mail en DNS
 - Echte SMTP/Resend, `MAIL_FROM_ADDRESS` op eigen domein, plus SPF, DKIM en DMARC.
+- Klantaccounts loggen in met een **code per e-mail**: zonder werkende mail kan niemand inloggen. Test dit na livegang met een eigen adres. Ondertekende links (factuur, retour) en tokens vragen een juiste `APP_URL`/`TRUSTED_PROXIES` achter een proxy.
 - `OWNER_ALERT_EMAIL` ingesteld: hier komen meldingen bij mislukte CJ-bestellingen, terugbetalingen en betwistingen.
 
 ## 7. Juridisch (niet in code op te lossen)
