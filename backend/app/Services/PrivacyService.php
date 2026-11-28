@@ -161,6 +161,7 @@ class PrivacyService
         app(MarketingService::class)->prune();
         app(AnalyticsService::class)->prune();
         \App\Models\AdminAuditLog::where('created_at', '<', now()->subMonths(12))->delete();
+        \Illuminate\Support\Facades\DB::table('ai_usage')->where('created_at', '<', now()->subMonths(12))->delete();
         $stale = \App\Models\Customer::where(fn ($q) => $q->where('last_login_at', '<', now()->subYears(3))->orWhere(fn ($n) => $n->whereNull('last_login_at')->where('created_at', '<', now()->subYears(3))))->pluck('id');
         if ($stale->isNotEmpty()) {
             DB::table('personal_access_tokens')->where('tokenable_type', \App\Models\Customer::class)->whereIn('tokenable_id', $stale)->delete();

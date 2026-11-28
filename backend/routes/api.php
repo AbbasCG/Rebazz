@@ -3,6 +3,7 @@
 use App\Http\Controllers\AccountController;
 use App\Http\Controllers\AdminAccountController;
 use App\Http\Controllers\AdminController;
+use App\Http\Controllers\AiController;
 use App\Http\Controllers\AnalyticsController;
 use App\Http\Controllers\CustomerAuthController;
 use App\Http\Controllers\DocumentController;
@@ -74,6 +75,7 @@ Route::prefix('admin')->middleware(['auth:sanctum', 'abilities:admin', 'audit'])
 
     Route::middleware('staff:any')->group(function () {
         Route::get('/status', [AdminController::class, 'status']);
+        Route::get('/ai/status', [AiController::class, 'status']);
         Route::get('/settings/{key}', [AdminController::class, 'setting']);
         Route::put('/settings/{key}', [AdminController::class, 'saveSetting']); // per sleutel gecontroleerd in de controller
     });
@@ -120,6 +122,13 @@ Route::prefix('admin')->middleware(['auth:sanctum', 'abilities:admin', 'audit'])
         Route::put('/products/{product}', [AdminController::class, 'updateProduct']);
         Route::delete('/products/{product}', [AdminController::class, 'destroyProduct']);
     });
+    // AI-hulp (Claude): per werkgebied, ruim begrensd per IP en per medewerker (zie AI_DAILY_LIMIT).
+    Route::middleware('staff:products')->post('/ai/description', [AiController::class, 'description'])->middleware('throttle:20,1,ai-description');
+    Route::middleware('staff:marketing')->group(function () {
+        Route::post('/ai/ad-copy', [AiController::class, 'adCopy'])->middleware('throttle:20,1,ai-ad');
+        Route::post('/ai/video-script', [AiController::class, 'videoScript'])->middleware('throttle:20,1,ai-video');
+    });
+    Route::middleware('staff:orders')->post('/ai/support-reply', [AiController::class, 'supportReply'])->middleware('throttle:20,1,ai-support');
     Route::middleware('staff:tax')->get('/tax', [AdminController::class, 'tax']);
     Route::middleware('staff:marketing')->group(function () {
         Route::get('/subscribers', [AdminController::class, 'subscribers']);

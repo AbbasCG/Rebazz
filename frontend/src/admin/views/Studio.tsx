@@ -7,13 +7,13 @@ import { Icon, MButton, ProductVisual, useToast } from '../../components/ui';
 import { api } from '../../lib/api';
 import { LANGUAGES } from '../../lib/i18n';
 import type { Product } from '../../lib/types';
-import { AI } from '../ai';
+import { AiNote, useAiStatus } from '../AiBits';
 import { eur } from '../context';
 import { useAdminProducts } from './Products';
 
 const PLATFORMS: Record<string, [string, string, string]> = { tiktok: ['TikTok', '9:16', ''], reels: ['Instagram Reels', '9:16', ''], shorts: ['YouTube Shorts', '9:16', ''], feed: ['Meta-feed', '1:1', 'square'], story: ['Pinterest / feed 4:5', '4:5', 'portrait'] };
 const STYLES: Record<string, string> = { ugc: 'UGC-testimonial', demo: 'Productdemonstratie', luxury: 'Luxe / cinematografisch', problem: 'Probleem → oplossing' };
-type Scene = ReturnType<typeof AI.script>[number];
+interface Scene { t: string; role: string; visual: string; vo: string; cap: string }
 interface Video { id: string; productId: string; name: string; platform: string; duration: number; lang: string; date: string }
 
 export default function Studio() {
@@ -28,22 +28,25 @@ export default function Studio() {
   const [voice, setVoice] = useState('Vrouw (warm)');
   const [cta, setCta] = useState('Bestel nu met gratis verzending');
   const [step, setStep] = useState(-1);
-  const [result, setResult] = useState<{ p: Product; scenes: Scene[] } | null>(null);
+  const [result, setResult] = useState<{ p: Product; scenes: Scene[]; tags: string[] } | null>(null);
+  const aiStatus = useAiStatus(result);
   const [videos, setVideos] = useState<Video[]>([]);
 
   useEffect(() => { if (!productId && products[0]) setProductId(products[0].id); }, [products, productId]);
   useEffect(() => { api.admin.setting<Video[]>('videos').then(r => setVideos(r.value ?? [])).catch(() => {}); }, []);
 
-  const generate = () => {
+  /* Het script komt van Claude; de stappen tonen alleen de voortgang tot het antwoord er is (daarna volgt de voorbeeldweergave in de browser). */
+  const generate = async () => {
     const p = products.find(x => x.id === productId);
     if (!p) return;
     setResult(null);
-    let i = 0;
     setStep(0);
-    const timer = setInterval(() => {
-      i++; setStep(i);
-      if (i >= 5) { clearInterval(timer); setStep(-1); setResult({ p, scenes: AI.script(p, { style, duration, lang: lang === 'nl' ? 'nl' : 'en', cta }) }); }
-    }, 420);
+    const timer = setInterval(() => setStep(s => (s >= 1 && s < 4 ? s + 1 : s)), 2500);
+    try {
+      const r = await api.admin.ai.videoScript({ product_id: p.id, style, duration, lang, cta });
+      setResult({ p, scenes: r.scenes.map(s => ({ t: s.time, role: s.role, visual: s.visual, vo: s.voiceover, cap: s.caption })), tags: r.hashtags.map(h => '#' + h.replace(/^#/, '')) });
+    } catch (e) { toast((e as Error).message, 'error'); }
+    finally { clearInterval(timer); setStep(-1); }
   };
   const saveVideo = async () => {
     if (!result) return;
@@ -59,7 +62,7 @@ export default function Studio() {
   return (
     <div className="studio">
       <div className="card">
-        <div className="card-head"><div><h3>Videoconfiguratie</h3><p>Voorbeeldgenerator: script, storyboard en voorbeeldweergave.</p></div></div>
+        <div className="card-head"><div><h3>Videoconfiguratie</h3><p>Script en storyboard door AI, met een voorbeeldweergave in de browser.</p></div></div>
         <div className="card-body" style={{ display: 'grid', gap: 16 }}>
           <div className="field"><label htmlFor="vProduct">Product</label><select className="select" id="vProduct" value={productId} onChange={e => setProductId(e.target.value)}>{products.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</select></div>
           <div className="field"><span className="label">Platform en formaat</span>{Seg({ value: platform, set: setPlatform, options: PLATFORMS })}</div>
@@ -70,7 +73,8 @@ export default function Studio() {
             <div className="field"><label htmlFor="vVoice">Voice-over</label><select className="select" id="vVoice" value={voice} onChange={e => setVoice(e.target.value)}>{['Vrouw (warm)', 'Man (zakelijk)', 'Vrouw (energiek)', 'Geen voice-over'].map(v => <option key={v}>{v}</option>)}</select></div>
           </div>
           <div className="field"><label htmlFor="vCta">Call-to-action</label><input className="input" id="vCta" value={cta} onChange={e => setCta(e.target.value)} /></div>
-          <MButton className="btn btn-accent btn-lg" onClick={generate} disabled={step >= 0 || !productId}><Icon name="wand" size={18} />Video genereren</MButton>
+          <MButton className="btn btn-accent btn-lg" onClick={() => void generate()} disabled={step >= 0 || !productId || (aiStatus !== null && !aiStatus.enabled)}><Icon name="wand" size={18} />Script genereren</MButton>
+          <AiNote status={aiStatus} extra="De videobeelden zelf worden niet door AI gemaakt: u ziet een storyboard als voorbeeld." />
         </div>
       </div>
       <div className="stack-20">
@@ -89,7 +93,7 @@ export default function Studio() {
                   <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}><span className="badge accent plain">{PLATFORMS[platform][0]} · {PLATFORMS[platform][1]}</span><span className="badge plain">{STYLES[style]}</span><span className="badge plain">{duration} sec</span></div>
                   <div><div className="section-label">Script en storyboard</div><div className="table-wrap"><table className="t script-table"><thead><tr><th>Tijd</th><th>Scène</th><th>Voice-over / tekst</th></tr></thead>
                     <tbody>{result.scenes.map(s => <tr key={s.t}><td>{s.t}</td><td><b>{s.role}</b><br /><span className="muted" style={{ fontSize: 12.5 }}>{s.visual}</span></td><td>{s.vo}</td></tr>)}</tbody></table></div></div>
-                  <div><div className="section-label">Bijschrift en hashtags</div><p style={{ fontSize: 13.5 }}>{result.p.features[0]} · {result.p.features[1]} ✨ {AI.hashtags(result.p).join(' ')}</p></div>
+                  <div><div className="section-label">Bijschrift en hashtags</div><p style={{ fontSize: 13.5 }}>{result.p.features[0]} · {result.p.features[1]} {result.tags.join(' ')}</p></div>
                   <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}><MButton className="btn btn-primary" onClick={saveVideo}><Icon name="check" size={16} />Opslaan in bibliotheek</MButton><button className="btn btn-ghost" onClick={() => toast('Export als MP4 volgt zodra de video-API is gekoppeld')}>Exporteren (MP4)</button></div>
                 </div>
               </motion.div>

@@ -1,5 +1,5 @@
 /* Verbinding met de Laravel-API. In ontwikkeling stuurt Vite /api door naar Laravel. */
-import type { AccountOrder, AnalyticsReport, FeedCheck, ImportResult, AuditEntry, StaffMe, TeamMember, Campaign, CampaignInput, AccountOrderDetail, AdminReturn, Catalog, Order, Product, TrackedOrder } from './types';
+import type { AccountOrder, AiAdCopy, AiDescription, AiStatus, AiSupportReply, AiVideoScript, AnalyticsReport, FeedCheck, ImportResult, AuditEntry, StaffMe, TeamMember, Campaign, CampaignInput, AccountOrderDetail, AdminReturn, Catalog, Order, Product, TrackedOrder } from './types';
 
 export class ApiError extends Error {
   status: number;
@@ -160,6 +160,13 @@ export const api = {
     },
     products: () => request<{ products: Product[] }>('GET', '/admin/products', undefined, true),
     /** Alle producten als CSV (sep: semicolon voor Excel NL, comma, tab). */
+    ai: {
+      status: () => request<AiStatus>('GET', '/admin/ai/status', undefined, true),
+      description: (b: { name: string; category?: string; features?: string[]; description?: string; notes?: string; manufacturer?: string; lang?: string }) => request<AiDescription>('POST', '/admin/ai/description', b, true),
+      adCopy: (b: { product_id: string; platform: string; goal: string; lang?: string }) => request<AiAdCopy>('POST', '/admin/ai/ad-copy', b, true),
+      videoScript: (b: { product_id: string; style: string; duration: number; lang?: string; cta: string }) => request<AiVideoScript>('POST', '/admin/ai/video-script', b, true),
+      supportReply: (b: { message: string; order_no?: string }) => request<AiSupportReply>('POST', '/admin/ai/support-reply', b, true)
+    },
     exportProducts: async (sep: 'semicolon' | 'comma' | 'tab'): Promise<Blob> => {
       const res = await fetch(BASE + '/api/admin/products/export?sep=' + sep, { headers: { Authorization: 'Bearer ' + adminToken.get(), Accept: 'text/csv' } });
       if (!res.ok) throw new ApiError('Export niet beschikbaar (' + res.status + ')', res.status, null);

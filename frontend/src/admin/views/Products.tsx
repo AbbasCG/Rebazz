@@ -7,6 +7,8 @@ import type { Product, ProductOption, ProductVariant } from '../../lib/types';
 import { eur, pct } from '../context';
 import { Modal, useConfirm } from '../parts';
 import ProductExchange from './ProductExchange';
+import { AiNote, useAiStatus } from '../AiBits';
+import type { AiDescription } from '../../lib/types';
 
 const margin = (p: Product) => (p.price ? (p.price - (p.cost ?? 0)) / p.price : 0);
 export const emptyProduct = (): Product => ({
@@ -127,6 +129,17 @@ function ProductEditor({ initial, isNew, onClose, onSave }: { initial: Product; 
   };
   const toast = useToast();
   const set = <K extends keyof Product>(k: K, v: Product[K]) => setP(x => ({ ...x, [k]: v }));
+  const [aiNotes, setAiNotes] = useState('');
+  const [aiBusy, setAiBusy] = useState(false);
+  const [aiOut, setAiOut] = useState<AiDescription | null>(null);
+  const aiStatus = useAiStatus(aiOut);
+  const writeWithAi = async () => {
+    if (!p.name.trim()) { toast('Vul eerst een productnaam in', 'error'); return; }
+    setAiBusy(true);
+    try { setAiOut(await api.admin.ai.description({ name: p.name, category: p.category, features: features.split('\n').map(s => s.trim()).filter(Boolean), description: p.description, notes: aiNotes, manufacturer: p.manufacturer })); }
+    catch (e) { toast((e as Error).message, 'error'); }
+    finally { setAiBusy(false); }
+  };
   const num = (v: string) => { const n = parseFloat(v); return isNaN(n) ? 0 : Math.round(n * 100) / 100; };
   const F = ({ label, k, type = 'text', hint, full }: { label: string; k: keyof Product; type?: string; hint?: string; full?: boolean }) => (
     <div className="field" style={full ? { gridColumn: '1/-1' } : undefined}>
@@ -164,7 +177,25 @@ function ProductEditor({ initial, isNew, onClose, onSave }: { initial: Product; 
         <div className="field"><label htmlFor="e-dmax">Levertijd max. (werkdagen)</label><input className="input" id="e-dmax" type="number" min={1} value={p.days[1]} onChange={e => set('days', [p.days[0], Math.max(1, parseInt(e.target.value) || 1)])} /></div>
         <label className="check" style={{ gridColumn: '1/-1', display: 'flex', gap: 8, alignItems: 'center', fontSize: 14 }}><input type="checkbox" checked={!!p.trackStock} onChange={e => set('trackStock', e.target.checked)} />Voorraad bijhouden (niet doen bij dropshipping: de leverancier heeft de voorraad)</label>
         {p.trackStock && F({ label: 'Voorraad (stuks)', k: 'stock', type: 'number', hint: 'Verkochte stuks worden automatisch afgeschreven; op 0 staat het product als "uitverkocht" in de winkel.', full: true })}
-        <div className="field" style={{ gridColumn: '1/-1' }}><label htmlFor="e-desc">Beschrijving</label><textarea className="textarea" id="e-desc" rows={4} value={p.description} onChange={e => set('description', e.target.value)} /></div>
+        <div className="field" style={{ gridColumn: '1/-1' }}><label htmlFor="e-desc">Beschrijving</label><textarea className="textarea" id="e-desc" rows={4} value={p.description} onChange={e => set('description', e.target.value)} />
+          <div style={{ display: 'flex', gap: 8, marginTop: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+            <input className="input" style={{ flex: 1, minWidth: 180 }} aria-label="Extra informatie voor de AI" placeholder="Extra feiten voor de AI (bijv. materiaal, afmetingen, batterijduur)" value={aiNotes} onChange={e => setAiNotes(e.target.value)} maxLength={1000} />
+            <MButton className="btn btn-outline" type="button" onClick={() => void writeWithAi()} disabled={aiBusy || (aiStatus !== null && !aiStatus.enabled)}><Icon name="wand" size={16} />{aiBusy ? 'Bezig…' : 'Schrijven met AI'}</MButton>
+          </div>
+          <AiNote status={aiStatus} />
+          {aiOut && (
+            <div className="card" style={{ padding: 12, marginTop: 8, background: 'var(--bg)' }} role="status">
+              <b>Voorstel van de AI</b>
+              <p style={{ whiteSpace: 'pre-line', margin: '6px 0' }}>{aiOut.description}</p>
+              <ul style={{ margin: '0 0 6px', paddingInlineStart: 18 }}>{aiOut.features.map(f => <li key={f}>{f}</li>)}</ul>
+              <p className="hint">Meta-beschrijving: {aiOut.meta_description}</p>
+              <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+                <button className="btn btn-primary btn-sm" type="button" onClick={() => { set('description', aiOut.description); setFeatures(aiOut.features.join('\n')); setAiOut(null); toast('Voorstel overgenomen: controleer en sla op'); }}>Overnemen</button>
+                <button className="btn btn-ghost btn-sm" type="button" onClick={() => setAiOut(null)}>Verwerpen</button>
+              </div>
+            </div>
+          )}
+        </div>
         <div className="field" style={{ gridColumn: '1/-1' }}><label htmlFor="e-feat">Kenmerken (één per regel)</label><textarea className="textarea" id="e-feat" rows={4} value={features} onChange={e => setFeatures(e.target.value)} /></div>
         <div style={{ gridColumn: '1/-1', borderTop: '1px solid var(--line)', paddingTop: 12 }}><b style={{ fontSize: 14 }}>Foto's en varianten</b><p className="hint">Extra foto's verschijnen in de galerij. Varianten (bijv. maat of kleur) hebben elk een eigen prijs, inkoopprijs, CJ-variant en voorraad; laat prijs of inkoop leeg om die van het product te gebruiken.</p></div>
         <div className="field" style={{ gridColumn: '1/-1' }}>

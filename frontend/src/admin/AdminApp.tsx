@@ -38,7 +38,7 @@ export const ROUTES = [
   { group: 'Operatie', items: [
     { id: 'bestellingen', label: 'Bestellingen & verzending', icon: 'truck', sub: 'Verwerk, volg en controleer alle zendingen' },
     { id: 'retouren', label: 'Retouren', icon: 'refresh', sub: 'Retouraanvragen beoordelen, ontvangen en terugbetalen' },
-    { id: 'klantenservice', label: 'Klantenservice', icon: 'message', ai: true, sub: 'Meertalige inbox met AI-antwoordsuggesties' },
+    { id: 'klantenservice', label: 'Klantenservice', icon: 'message', ai: true, sub: 'Klantberichten vertalen en beantwoorden met AI' },
     { id: 'automatisering', label: 'Automatiseringen', icon: 'bot', sub: 'Terugkerende taken automatisch laten uitvoeren' }
   ] },
   { group: 'Beheer', items: [

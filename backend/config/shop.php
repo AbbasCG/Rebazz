@@ -50,6 +50,15 @@ return [
     // Statistieken (eigen, zonder derden, alleen na toestemming): bewaartermijn in maanden.
     'analytics_months' => (int) env('SHOP_ANALYTICS_MONTHS', 13),
 
+    // AI (Claude, Anthropic): de sleutel staat alleen op de server. Standaardmodel is het krachtigste; kies voor lagere kosten bijv. AI_MODEL=claude-haiku-5-5 of claude-sonnet-5-5.
+    'ai' => [
+        'key' => env('ANTHROPIC_API_KEY'),
+        'model' => env('AI_MODEL', 'claude-opus-5-5'),
+        'effort' => env('AI_EFFORT', 'medium'),
+        'daily_limit' => (int) env('AI_DAILY_LIMIT', 300),
+        'user_daily_limit' => (int) env('AI_USER_DAILY_LIMIT', 100),
+    ],
+
     'currency' => 'eur',
 
     // Standaard bedrijfsgegevens; aanpasbaar in het dashboard (opgeslagen in de tabel settings).

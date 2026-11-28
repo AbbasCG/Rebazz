@@ -1,37 +1,9 @@
-/* AI-sjablonen (gesimuleerd). In een volgende fase te vervangen door echte AI-koppelingen. */
+/* Alleen nog voor de voorbeeld-productzoeker (Onderzoek): vaste sjablonen. De echte AI-functies (productteksten, advertenties, scripts, klantenservice) lopen via de server (api.admin.ai.*). */
 import type { Product } from '../lib/types';
-
-const eur = (v: number) => new Intl.NumberFormat('nl-NL', { style: 'currency', currency: 'EUR' }).format(v);
 
 export const AI = {
   description: (p: Pick<Product, 'name' | 'features' | 'warehouse'>) =>
-    'Ontdek de ' + p.name.toLowerCase() + ': ontworpen voor wie kwaliteit en gemak waardeert. ' + p.features.slice(0, 3).join(', ').toLowerCase() + '. Snel geleverd vanuit ' + p.warehouse + ' en gedekt door onze 30 dagen bedenktijd.',
-  script(p: Product, opt: { style: string; duration: number; lang: string; cta: string }) {
-    const en = opt.lang === 'en';
-    const d = opt.duration;
-    const cut = (n: number) => Math.round(d * n);
-    const f = p.features;
-    const hooks: Record<string, string> = en
-      ? { ugc: 'I didn’t expect this to be so good…', demo: 'Watch this in 3 seconds.', luxury: 'Designed for those who expect more.', problem: 'Still struggling with this every day?' }
-      : { ugc: 'Ik had niet verwacht dat dit zó goed zou zijn…', demo: 'Kijk wat dit in 3 seconden doet.', luxury: 'Ontworpen voor wie meer verwacht.', problem: 'Heeft u hier elke dag nog last van?' };
-    const hook = hooks[opt.style];
-    return [
-      { t: '0–' + cut(0.15) + 's', role: 'Hook', visual: 'Close-up van het product, snelle inzoom', vo: hook, cap: hook },
-      { t: cut(0.15) + '–' + cut(0.4) + 's', role: en ? 'Problem' : 'Probleem', visual: 'Herkenbare situatie zonder het product', vo: en ? 'Most alternatives are expensive, slow or simply disappointing.' : 'De meeste alternatieven zijn duur, traag of stellen simpelweg teleur.', cap: en ? 'Sound familiar?' : 'Herkenbaar?' },
-      { t: cut(0.4) + '–' + cut(0.7) + 's', role: en ? 'Solution' : 'Oplossing', visual: 'Product in gebruik, kenmerken in beeld', vo: (en ? 'Meet the ' : 'Maak kennis met de ') + p.name + '. ' + f.slice(0, 2).join('. ') + '.', cap: f[0] ?? p.name },
-      { t: cut(0.7) + '–' + cut(0.88) + 's', role: en ? 'Proof' : 'Bewijs', visual: 'Kenmerken en garantie in beeld', vo: en ? '30-day return period and fast delivery.' : '30 dagen bedenktijd en snelle levering.', cap: en ? '30 days to try it' : '30 dagen proberen' },
-      { t: cut(0.88) + '–' + d + 's', role: 'CTA', visual: 'Productshot met prijs en knop', vo: opt.cta, cap: opt.cta }
-    ];
-  },
-  adCopy(p: Product, goal: string) {
-    const save = p.compare && p.compare > p.price ? Math.round((1 - p.price / p.compare) * 100) : 0;
-    return [
-      { headline: p.name + (save ? ' — nu ' + save + '% voordeliger' : ''), text: p.features.slice(0, 3).map(x => '✓ ' + x).join('\n') + '\nGratis verzending vanaf € 49 · 30 dagen bedenktijd.', cta: 'Nu bestellen' },
-      { headline: 'Waarom kiezen voor de ' + p.name.split(' ')[0] + '?', text: p.description.split('.')[0] + '. Vandaag besteld, snel verzonden.', cta: 'Meer informatie' },
-      { headline: (goal === 'Retargeting' ? 'Nog steeds aan het twijfelen?' : 'Nieuw bij Rebazz') + ' — vanaf ' + eur(p.price), text: goal === 'Retargeting' ? 'Uw ' + p.name.toLowerCase() + ' ligt nog klaar.' : 'Ontdek de ' + p.name.toLowerCase() + '. ' + (p.features[1] ?? '') + '.', cta: goal === 'Retargeting' ? 'Afronden' : 'Shop nu' }
-    ];
-  },
-  hashtags: (p: Product) => ['#' + p.category.toLowerCase(), '#rebazz', '#musthave', '#' + p.name.split(' ')[0].toLowerCase(), '#review']
+    'Ontdek de ' + p.name.toLowerCase() + ': ontworpen voor wie kwaliteit en gemak waardeert. ' + p.features.slice(0, 3).join(', ').toLowerCase() + '. Snel geleverd vanuit ' + p.warehouse + ' en gedekt door onze 30 dagen bedenktijd.'
 };
 
 export const CANDIDATES = [

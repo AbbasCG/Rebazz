@@ -97,6 +97,13 @@ export interface Catalog {
   products: Product[];
 }
 
+/** AI-hulp in het beheer (Claude). */
+export interface AiStatus { enabled: boolean; model: string; today: { calls: number; input: number; output: number; limit: number; mine: number; myLimit: number }; month: { calls: number; input: number; output: number } }
+export interface AiDescription { description: string; features: string[]; meta_description: string }
+export interface AiAdCopy { variants: { headline: string; text: string; cta: string }[]; hashtags: string[] }
+export interface AiVideoScript { scenes: { time: string; role: string; visual: string; voiceover: string; caption: string }[]; hashtags: string[] }
+export interface AiSupportReply { language: string; translation_nl: string; summary_nl: string; category: string; reply: string; actions: string[] }
+
 /** Resultaat van een CSV-import (voorbeeld of toegepast). */
 export interface ImportResult {
   dryRun?: boolean; applied?: boolean; checksum: string; error?: string; message?: string;

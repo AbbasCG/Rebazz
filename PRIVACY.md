@@ -17,12 +17,14 @@ Dit is een **technisch overzicht van wat de software doet**, bedoeld als startpu
 | Cookiekeuze (analytics/marketing weigeren of toestaan) | alleen browser (`localStorage`) | Toestemming onthouden | Toestemmingsregistratie | In de browser van de bezoeker. Eigen statistieken (hierboven) meten alleen na toestemming; er worden geen trackers van derden geladen. |
 | Beheer-activiteitenlogboek: wie (naam, e-mail), welke actie (route, uitkomst), IP-adres, tijd; nooit wachtwoorden of inhoud | tabel `admin_audit_logs` | Beveiliging en verantwoording van medewerkers | Gerechtvaardigd belang (art. 6 lid 1 f) | **12 maanden** (`shop:gdpr-retention`) |
 | Medewerkersaccounts: naam, e-mail, rol, wachtwoord-hash, versleuteld 2FA-geheim en hashes van herstelcodes | tabel `users` | Toegang tot het beheer | Gerechtvaardigd belang / arbeidsovereenkomst | Tot het account wordt verwijderd |
+| AI-gebruik: medewerker, functie, model, aantal tokens, tijd; nooit de tekst zelf | tabel `ai_usage` | Limieten en kostenbewaking | Gerechtvaardigd belang | **12 maanden** (`shop:gdpr-retention`) |
 | Logbestanden (`storage/logs`) | server | Foutopsporing | Gerechtvaardigd belang | Houd ze kort (bijv. `LOG_STACK=daily` met 14 dagen) en let op: bij `MAIL_MAILER=log` komt mailinhoud (e-mailadressen) in het log. |
 
 Niet opgeslagen: kaartgegevens (Stripe-pagina), wachtwoorden van klanten (er zijn geen klantaccounts), IP-adressen in de database.
 
 ## Ontvangers / verwerkers (voor uw register en verwerkersovereenkomsten)
 - **Stripe**: betalingen (bevat naam, e-mail, adres, betaalgegevens). Eigen verantwoordelijke voor fraude/witwassen.
+- **Anthropic (Claude, VS)**: alleen als u de AI-functies in het beheer gebruikt (`ANTHROPIC_API_KEY`). Verzonden wordt: productgegevens (naam, kenmerken, prijs; nooit inkoopprijs of leverancier), en bij klantenservice-hulp de tekst van een klantbericht met e-mailadressen, telefoonnummers en IBAN's eruit gehaald, plus verzend-/retourgegevens van een bestelling zonder naam, adres, e-mail of telefoon. Bij Anthropic geldt een verwerkersovereenkomst via hun voorwaarden; neem Anthropic op in uw register, vermeld de doorgifte naar de VS (SCC's/DPF) in uw privacyverklaring, en vul in het klantenservice-proces aan dat berichten voor een conceptantwoord door een AI-dienst worden verwerkt. Klanten krijgen nooit automatisch een AI-antwoord: een medewerker leest en verstuurt zelf.
 - **CJdropshipping** (China): voert bestellingen uit; ontvangt naam, adres, telefoon, e-mail. Doorgifte buiten de EER: vraag om SCC's/afspraken en vermeld dit in uw privacyverklaring.
 - **Mailprovider / SMTP**: verstuurt orderbevestigingen en andere e-mails.
 - **Hosting/database**: waar de applicatie en de PostgreSQL-database draaien.

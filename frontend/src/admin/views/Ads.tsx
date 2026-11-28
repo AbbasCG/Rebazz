@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react';
 import { Icon, MButton, useToast } from '../../components/ui';
 import { SEED_CAMPAIGNS } from '../../lib/i18n';
 import { api } from '../../lib/api';
-import { AI } from '../ai';
+import { AiNote, useAiStatus } from '../AiBits';
+import type { AiAdCopy } from '../../lib/types';
 import { eur } from '../context';
 import { Kpi, Modal } from '../parts';
 import { useAdminProducts } from './Products';
@@ -18,7 +19,17 @@ export default function Ads() {
   const [list, setList] = useState<Campaign[]>([]);
   const [modal, setModal] = useState(false);
   const [form, setForm] = useState({ platform: 'Meta', goal: 'Verkopen', product: '', market: 'Nederland & België', budget: 30 });
-  const [copy, setCopy] = useState<ReturnType<typeof AI.adCopy> | null>(null);
+  const [copy, setCopy] = useState<AiAdCopy | null>(null);
+  const [copyBusy, setCopyBusy] = useState(false);
+  const aiStatus = useAiStatus(copy);
+  const writeCopy = async () => {
+    if (!prod) return;
+    setCopyBusy(true);
+    try {
+      setCopy(await api.admin.ai.adCopy({ product_id: prod.id, platform: ({ Meta: 'meta', Google: 'google', TikTok: 'tiktok', Pinterest: 'pinterest' } as Record<string, string>)[form.platform] ?? 'meta', goal: ({ Verkopen: 'conversie', Retargeting: 'retargeting', Verkeer: 'awareness' } as Record<string, string>)[form.goal] ?? 'conversie' }));
+    } catch (e) { toast((e as Error).message, 'error'); }
+    finally { setCopyBusy(false); }
+  };
 
   useEffect(() => { api.admin.setting<Campaign[]>('campaigns').then(r => setList(r.value ?? SEED)).catch(() => setList(SEED)); }, []);
   const persist = async (next: Campaign[], msg: string) => { setList(next); try { await api.admin.saveSetting('campaigns', next); toast(msg); } catch { toast('Opslaan mislukt', 'error'); } };
@@ -60,8 +71,9 @@ export default function Ads() {
           <div className="field"><label htmlFor="cMarket">Landen</label><select className="select" id="cMarket" value={form.market} onChange={e => setForm({ ...form, market: e.target.value })}>{['Nederland & België', 'Europese Unie', 'VK, VS & Canada', 'Wereldwijd'].map(x => <option key={x}>{x}</option>)}</select></div>
           <div className="field"><label htmlFor="cBudget">Dagbudget (€)</label><input className="input" id="cBudget" type="number" min={5} value={form.budget} onChange={e => setForm({ ...form, budget: parseFloat(e.target.value) || 30 })} /></div>
         </div>
-        <button className="btn btn-outline" type="button" onClick={() => prod && setCopy(AI.adCopy(prod, form.goal))}><Icon name="wand" size={16} />Advertentieteksten genereren</button>
-        {copy && <div><div className="section-label">3 varianten voor A/B-test</div>{copy.map((v, i) => <div key={i} style={{ border: '1px solid var(--line)', borderRadius: 12, padding: 14, marginBottom: 10 }}><span className="badge accent plain">Variant {'ABC'[i]}</span><p style={{ fontWeight: 700, margin: '8px 0 4px' }}>{v.headline}</p><p style={{ whiteSpace: 'pre-line', fontSize: 13.5, color: 'var(--ink-2)' }}>{v.text}</p><p className="hint" style={{ marginTop: 6 }}>Knop: {v.cta}</p></div>)}</div>}
+        <button className="btn btn-outline" type="button" onClick={() => void writeCopy()} disabled={copyBusy || !prod || (aiStatus !== null && !aiStatus.enabled)}><Icon name="wand" size={16} />{copyBusy ? 'Bezig…' : 'Advertentieteksten genereren'}</button>
+        <AiNote status={aiStatus} extra="De limieten van het gekozen platform zijn meegegeven." />
+        {copy && <div><div className="section-label">3 varianten voor A/B-test</div>{copy.variants.map((v, i) => <div key={i} style={{ border: '1px solid var(--line)', borderRadius: 12, padding: 14, marginBottom: 10 }}><span className="badge accent plain">Variant {'ABC'[i]}</span><p style={{ fontWeight: 700, margin: '8px 0 4px' }}>{v.headline}</p><p style={{ whiteSpace: 'pre-line', fontSize: 13.5, color: 'var(--ink-2)' }}>{v.text}</p><p className="hint" style={{ marginTop: 6 }}>Knop: {v.cta}</p></div>)}{copy.hashtags.length > 0 && <p className="hint">{copy.hashtags.map(h => '#' + h).join(' ')}</p>}</div>}
       </Modal>
     </>
   );
