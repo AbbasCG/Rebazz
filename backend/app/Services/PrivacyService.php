@@ -103,6 +103,8 @@ class PrivacyService
 
         DB::transaction(function () use ($email, &$result) {
             $result['newsletter_deleted'] = NewsletterSubscriber::whereRaw('lower(email) = ?', [$email])->delete() > 0;
+            \App\Models\AbandonedCart::where('email', $email)->delete();
+            \App\Models\NewsletterDelivery::where('email', $email)->delete();
             foreach ($this->ordersFor($email)->with('returns')->get() as $order) {
                 if ($order->anonymized_at) {
                     continue;
@@ -156,6 +158,7 @@ class PrivacyService
         $requests = PrivacyRequest::where('requested_at', '<', now()->subYears(3))->delete();
         // Klantaccounts: verlopen inlogcodes opruimen en accounts die 3 jaar niet zijn gebruikt verwijderen (opslagbeperking).
         \App\Models\LoginCode::where('expires_at', '<', now()->subDay())->delete();
+        app(MarketingService::class)->prune();
         $stale = \App\Models\Customer::where(fn ($q) => $q->where('last_login_at', '<', now()->subYears(3))->orWhere(fn ($n) => $n->whereNull('last_login_at')->where('created_at', '<', now()->subYears(3))))->pluck('id');
         if ($stale->isNotEmpty()) {
             DB::table('personal_access_tokens')->where('tokenable_type', \App\Models\Customer::class)->whereIn('tokenable_id', $stale)->delete();

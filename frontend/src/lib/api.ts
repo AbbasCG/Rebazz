@@ -1,5 +1,5 @@
 /* Verbinding met de Laravel-API. In ontwikkeling stuurt Vite /api door naar Laravel. */
-import type { AccountOrder, AccountOrderDetail, AdminReturn, Catalog, Order, Product, TrackedOrder } from './types';
+import type { AccountOrder, Campaign, CampaignInput, AccountOrderDetail, AdminReturn, Catalog, Order, Product, TrackedOrder } from './types';
 
 export class ApiError extends Error {
   status: number;
@@ -153,7 +153,12 @@ export const api = {
     tax: (year: number, quarter: number) => request<TaxSummary>('GET', '/admin/tax?year=' + year + '&quarter=' + quarter, undefined, true),
     setting: <T>(key: string) => request<{ value: T | null }>('GET', '/admin/settings/' + key, undefined, true),
     saveSetting: (key: string, value: unknown) => request<{ value: unknown }>('PUT', '/admin/settings/' + key, { value }, true),
-    subscribers: () => request<{ subscribers: { email: string; lang: string; created_at: string }[] }>('GET', '/admin/subscribers', undefined, true)
+    subscribers: () => request<{ subscribers: { email: string; lang: string; created_at: string }[] }>('GET', '/admin/subscribers', undefined, true),
+    newsletters: () => request<{ campaigns: Campaign[]; subscribers: number; byLang: Record<string, number> }>('GET', '/admin/newsletters', undefined, true),
+    saveNewsletter: (id: number | null, body: CampaignInput) => request<Campaign>(id ? 'PUT' : 'POST', '/admin/newsletters' + (id ? '/' + id : ''), body, true),
+    deleteNewsletter: (id: number) => request<{ ok: boolean }>('DELETE', '/admin/newsletters/' + id, undefined, true),
+    testNewsletter: (id: number, email: string) => request<{ ok: boolean; to: string }>('POST', '/admin/newsletters/' + id + '/test', email ? { email } : {}, true),
+    sendNewsletter: (id: number) => request<Campaign>('POST', '/admin/newsletters/' + id + '/send', {}, true)
   }
 };
 

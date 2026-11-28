@@ -72,4 +72,15 @@ Artisan::command('shop:gdpr-retention', function (\App\Services\PrivacyService $
     $this->info("Geanonimiseerde bestellingen: {$r['anonymized']}, niet-bevestigde aanmeldingen gewist: {$r['newsletter_pending_deleted']}, oude verzoeken opgeruimd: {$r['requests_deleted']}, ongebruikte accounts verwijderd: {$r['accounts_deleted']}");
 })->purpose('Pas de AVG-bewaartermijnen toe');
 
+/* Marketing: herinneringen verlaten winkelwagen (alleen na toestemming) en nieuwsbrieven in porties. */
+Artisan::command('shop:cart-reminders', function (\App\Services\MarketingService $m) {
+    $this->info('Herinneringen verstuurd: '.$m->sendCartReminders());
+})->purpose('Verstuur herinneringen voor verlaten kassa-sessies (met toestemming)');
+Artisan::command('shop:send-newsletters', function (\App\Services\MarketingService $m) {
+    $this->info('Nieuwsbrieven verstuurd: '.$m->sendNewsletterBatch());
+})->purpose('Verstuur de volgende portie van lopende nieuwsbrief-campagnes');
+
+Schedule::command('shop:cart-reminders')->everyTenMinutes()->withoutOverlapping();
+Schedule::command('shop:send-newsletters')->everyMinute()->withoutOverlapping();
+
 Schedule::command('shop:gdpr-retention')->dailyAt('03:30')->withoutOverlapping();

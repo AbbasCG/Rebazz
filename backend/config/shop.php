@@ -41,6 +41,9 @@ return [
     // AVG: bestel- en factuurgegevens moeten fiscaal 7 jaar bewaard blijven (Nederland); daarna worden persoonsgegevens geanonimiseerd.
     'retention_years' => (int) env('SHOP_RETENTION_YEARS', 7),
 
+    // Verlaten winkelwagen: één herinnering per verlaten kassa, alleen na toestemming die Stripe in de kassa vraagt. 'off' = niets vragen en niets versturen.
+    'abandoned_cart' => env('SHOP_ABANDONED_CART', 'on') === 'on',
+
     'currency' => 'eur',
 
     // Standaard bedrijfsgegevens; aanpasbaar in het dashboard (opgeslagen in de tabel settings).

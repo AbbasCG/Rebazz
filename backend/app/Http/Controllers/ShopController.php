@@ -136,6 +136,10 @@ class ShopController extends Controller
                 'automatic_tax' => $tax ? ['enabled' => true] : null,
                 // Ingelogde klant: e-mail vastzetten (zodat de bestelling in het account verschijnt) en de bestelling aan het account koppelen.
                 'customer_email' => $account?->email,
+                // Herinnering bij verlaten kassa: Stripe vraagt zelf toestemming (opt-in, niet voorgevinkt) en maakt na het verlopen een herstel-link.
+                'consent_collection' => config('shop.abandoned_cart') ? ['promotions' => 'auto'] : null,
+                'expires_at' => config('shop.abandoned_cart') ? time() + 3600 : null,
+                'after_expiration' => config('shop.abandoned_cart') ? ['recovery' => ['enabled' => true, 'allow_promotion_codes' => (bool) config('shop.allow_promotion_codes')]] : null,
                 'metadata' => array_filter(['order_no' => $orderNo, 'items' => $packed, 'lang' => $lang, 'country' => $country, 'ship' => $q['express'] ? 'express' : 'standard', 'customer_id' => $account?->id]),
                 'payment_intent_data' => ['description' => 'Rebazz '.$orderNo, 'metadata' => ['order_no' => $orderNo]],
                 'success_url' => $origin.'/bedankt?session_id={CHECKOUT_SESSION_ID}',
@@ -318,6 +322,17 @@ class ShopController extends Controller
         $type = $event['type'] ?? '';
         if (in_array($type, ['charge.refunded', 'charge.dispute.created'], true)) {
             return $this->handleRefundOrDispute($type, $event['data']['object'] ?? [], $cj);
+        }
+        if ($type === 'checkout.session.expired') {
+            try {
+                app(\App\Services\MarketingService::class)->recordExpiredSession($event['data']['object'] ?? []);
+            } catch (Throwable $e) {
+                Log::error('Verlopen kassa vastleggen mislukt', ['error' => $e->getMessage()]);
+
+                return response()->json(['error' => 'failed'], 500);
+            }
+
+            return response()->json(['ok' => true]);
         }
         if (! in_array($type, ['checkout.session.completed', 'checkout.session.async_payment_succeeded'], true)) {
             return response()->json(['ignored' => $type]);

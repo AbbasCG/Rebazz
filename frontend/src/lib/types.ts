@@ -97,6 +97,14 @@ export interface Catalog {
   products: Product[];
 }
 
+/** Nieuwsbrief-campagne in het beheer. */
+export interface Campaign {
+  id: number; subject: string; body: string; cta_label: string | null; cta_url: string | null; lang: string | null;
+  status: 'draft' | 'sending' | 'sent'; sent: number; failed: number; audience: number;
+  started_at: string | null; finished_at: string | null; created_at: string;
+}
+export interface CampaignInput { subject: string; body: string; cta_label?: string | null; cta_url?: string | null; lang?: string | null }
+
 /** Bestelling in het klantaccount. */
 export interface AccountOrder {
   order_no: string; date: string; status: string; step: number; delayed: boolean; carrier: string; tracking: string; total: number;

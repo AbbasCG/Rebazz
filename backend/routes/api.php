@@ -5,6 +5,7 @@ use App\Http\Controllers\AdminController;
 use App\Http\Controllers\CustomerAuthController;
 use App\Http\Controllers\DocumentController;
 use App\Http\Controllers\MediaController;
+use App\Http\Controllers\NewsletterController;
 use App\Http\Controllers\PrivacyController;
 use App\Http\Controllers\ReturnController;
 use App\Http\Controllers\ShopController;
@@ -21,7 +22,7 @@ Route::get('/returns/{return}/credit-note', [DocumentController::class, 'returnC
 Route::post('/privacy/request', [PrivacyController::class, 'request'])->middleware('throttle:10,60,privacy-request');
 Route::get('/privacy/export', [PrivacyController::class, 'export'])->middleware(['signed', 'throttle:10,1,privacy-export'])->name('privacy.export');
 Route::post('/privacy/erase', [PrivacyController::class, 'erase'])->middleware(['signed', 'throttle:10,1,privacy-erase'])->name('privacy.erase');
-Route::get('/newsletter/unsubscribe', [PrivacyController::class, 'unsubscribe'])->middleware(['signed', 'throttle:30,1,nl-unsub'])->name('newsletter.unsubscribe');
+Route::match(['get', 'post'], '/newsletter/unsubscribe', [PrivacyController::class, 'unsubscribe'])->middleware(['signed', 'throttle:30,1,nl-unsub'])->name('newsletter.unsubscribe');
 // Klantaccount (zonder wachtwoord): inlogcode per e-mail; alles daarna onder /account met een token met het recht "customer".
 Route::post('/account/login', [CustomerAuthController::class, 'requestCode'])->middleware('throttle:30,60,acct-login');
 Route::post('/account/verify', [CustomerAuthController::class, 'verify'])->middleware('throttle:20,60,acct-verify');
@@ -75,4 +76,10 @@ Route::prefix('admin')->middleware(['auth:sanctum', 'abilities:admin'])->group(f
     Route::get('/settings/{key}', [AdminController::class, 'setting']);
     Route::put('/settings/{key}', [AdminController::class, 'saveSetting']);
     Route::get('/subscribers', [AdminController::class, 'subscribers']);
+    Route::get('/newsletters', [NewsletterController::class, 'index']);
+    Route::post('/newsletters', [NewsletterController::class, 'store']);
+    Route::put('/newsletters/{campaign}', [NewsletterController::class, 'update']);
+    Route::delete('/newsletters/{campaign}', [NewsletterController::class, 'destroy']);
+    Route::post('/newsletters/{campaign}/test', [NewsletterController::class, 'test'])->middleware('throttle:10,1,nl-test');
+    Route::post('/newsletters/{campaign}/send', [NewsletterController::class, 'send']);
 });

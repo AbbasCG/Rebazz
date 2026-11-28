@@ -43,7 +43,9 @@ GPSR-gegevens en CJ-variant-ID in via het beheer (`/beheer`) voordat u ze active
 
 ## 4. Stripe
 - Webhook-endpoint: `https://<domein>/api/stripe/webhook` met de events:
-  `checkout.session.completed`, `checkout.session.async_payment_succeeded`, `charge.refunded`, `charge.dispute.created`.
+  `checkout.session.completed`, `checkout.session.async_payment_succeeded`, `checkout.session.expired`, `charge.refunded`, `charge.dispute.created`.
+- **Herinnering verlaten winkelwagen** (`SHOP_ABANDONED_CART=on`, standaard): de kassa-sessie verloopt na 1 uur; Stripe toont een niet-voorgevinkt vakje voor toestemming en maakt na het verlopen een herstel-link. Alleen met toestemming sturen wij (`shop:cart-reminders`, elke 10 min) één mail. Dit hangt af van `checkout.session.expired` hierboven en is niet tegen echte Stripe getest: probeer het in testmodus (laat een kassa 1 uur open staan, of verloop hem handmatig) en pas `SHOP_ABANDONED_CART=off` toe als u het niet wilt. Vul uw verklaring bij 'Privacyverklaring' aan.
+- **Nieuwsbrieven** verstuurt u onder *Nieuwsbrief* in het beheer; de scheduler (cron hierboven, elke minuut) verstuurt per minuut 50 mails. Bij een eigen mailserver met een lage limiet: kies een bezorgdienst (Resend, Postmark, SES) en controleer SPF/DKIM/DMARC voordat u naar veel abonnees mailt.
 - Zet `STRIPE_TAX=on` en activeer Stripe Tax (live-modus weigert checkout zonder).
 - Beperk kortingscodes in Stripe (max. gebruik, minimumbedrag, alleen eerste bestelling), of zet `SHOP_ALLOW_PROMO=off`.
 - Doe eerst een testbetaling in testmodus en een kleine echte betaling met terugbetaling.
