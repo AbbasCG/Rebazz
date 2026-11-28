@@ -22,7 +22,10 @@ class Product extends Model
     protected static function booted(): void
     {
         // De openbare catalogus wordt even gecachet; elke wijziging maakt de cache meteen ongeldig.
-        $forget = fn () => Cache::forget('shop.catalog');
+        $forget = function () {
+            Cache::forget('shop.catalog');
+            Cache::forget(\App\Services\ProductFeed::CACHE);
+        };
         static::saved($forget);
         static::deleted($forget);
     }

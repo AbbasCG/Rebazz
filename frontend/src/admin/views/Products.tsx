@@ -6,6 +6,7 @@ import { api } from '../../lib/api';
 import type { Product, ProductOption, ProductVariant } from '../../lib/types';
 import { eur, pct } from '../context';
 import { Modal, useConfirm } from '../parts';
+import ProductExchange from './ProductExchange';
 
 const margin = (p: Product) => (p.price ? (p.price - (p.cost ?? 0)) / p.price : 0);
 export const emptyProduct = (): Product => ({
@@ -24,10 +25,11 @@ export function useAdminProducts(): [Product[], (p: Product[]) => void, boolean,
 
 export default function Products() {
   const toast = useToast();
-  const [products, setProducts, loading] = useAdminProducts();
+  const [products, setProducts, loading, reload] = useAdminProducts();
   const [query, setQuery] = useState('');
   const [editing, setEditing] = useState<{ p: Product; isNew: boolean } | null>(null);
   const [ask, confirmNode] = useConfirm();
+  const [exchange, setExchange] = useState(false);
 
   const save = async (p: Product, isNew: boolean, msg = 'Product is opgeslagen') => {
     try {
@@ -51,6 +53,7 @@ export default function Products() {
       <div className="page-intro">
         <p>{products.length} producten, waarvan {active} zichtbaar in de webwinkel. Wijzigingen worden direct in de database opgeslagen en zijn meteen zichtbaar voor klanten.</p>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <MButton className="btn btn-outline" onClick={() => setExchange(true)}><Icon name="external" size={16} />Importeren / exporteren</MButton>
           <Link to="/beheer/onderzoek" className="btn btn-outline"><Icon name="search" size={16} />Zoeken met AI</Link>
           <MButton className="btn btn-accent" onClick={() => setEditing({ p: emptyProduct(), isNew: true })}><Icon name="plus" size={16} />Nieuw product</MButton>
         </div>
@@ -83,6 +86,7 @@ export default function Products() {
         </table></div>
       </div>
       {editing && <ProductEditor key={editing.p.id} initial={editing.p} isNew={editing.isNew} onClose={() => setEditing(null)} onSave={async p => { if (await save(p, editing.isNew)) setEditing(null); }} />}
+      <ProductExchange open={exchange} onClose={() => setExchange(false)} onDone={() => void reload()} />
       {confirmNode}
     </>
   );

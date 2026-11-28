@@ -9,6 +9,7 @@ use App\Http\Controllers\DocumentController;
 use App\Http\Controllers\MediaController;
 use App\Http\Controllers\NewsletterController;
 use App\Http\Controllers\PrivacyController;
+use App\Http\Controllers\ProductExchangeController;
 use App\Http\Controllers\ReturnController;
 use App\Http\Controllers\ShopController;
 use App\Http\Controllers\TeamController;
@@ -112,6 +113,9 @@ Route::prefix('admin')->middleware(['auth:sanctum', 'abilities:admin', 'audit'])
     Route::middleware('staff:products')->group(function () {
         Route::post('/uploads', [MediaController::class, 'upload'])->middleware('throttle:60,1,uploads');
         Route::get('/products', [AdminController::class, 'products']);
+        Route::get('/products/export', [ProductExchangeController::class, 'export']);
+        Route::post('/products/import', [ProductExchangeController::class, 'import'])->middleware('throttle:20,10,products-import');
+        Route::get('/products/feed', [ProductExchangeController::class, 'feedCheck']);
         Route::post('/products', [AdminController::class, 'storeProduct']);
         Route::put('/products/{product}', [AdminController::class, 'updateProduct']);
         Route::delete('/products/{product}', [AdminController::class, 'destroyProduct']);

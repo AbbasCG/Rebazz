@@ -1,5 +1,5 @@
 /* Verbinding met de Laravel-API. In ontwikkeling stuurt Vite /api door naar Laravel. */
-import type { AccountOrder, AnalyticsReport, AuditEntry, StaffMe, TeamMember, Campaign, CampaignInput, AccountOrderDetail, AdminReturn, Catalog, Order, Product, TrackedOrder } from './types';
+import type { AccountOrder, AnalyticsReport, FeedCheck, ImportResult, AuditEntry, StaffMe, TeamMember, Campaign, CampaignInput, AccountOrderDetail, AdminReturn, Catalog, Order, Product, TrackedOrder } from './types';
 
 export class ApiError extends Error {
   status: number;
@@ -159,6 +159,25 @@ export const api = {
       return res.blob();
     },
     products: () => request<{ products: Product[] }>('GET', '/admin/products', undefined, true),
+    /** Alle producten als CSV (sep: semicolon voor Excel NL, comma, tab). */
+    exportProducts: async (sep: 'semicolon' | 'comma' | 'tab'): Promise<Blob> => {
+      const res = await fetch(BASE + '/api/admin/products/export?sep=' + sep, { headers: { Authorization: 'Bearer ' + adminToken.get(), Accept: 'text/csv' } });
+      if (!res.ok) throw new ApiError('Export niet beschikbaar (' + res.status + ')', res.status, null);
+      return res.blob();
+    },
+    /** CSV importeren: eerst als voorbeeld (dryRun), daarna toepassen met de checksum uit het voorbeeld. Geeft ook bij fouten (422) het volledige rapport terug. */
+    importProducts: async (file: File, dryRun: boolean, checksum = ''): Promise<ImportResult> => {
+      const body = new FormData();
+      body.append('file', file);
+      if (dryRun) body.append('dry_run', '1'); else body.append('checksum', checksum);
+      let res: Response;
+      try { res = await fetch(BASE + '/api/admin/products/import', { method: 'POST', headers: { Accept: 'application/json', Authorization: 'Bearer ' + adminToken.get() }, body }); }
+      catch { throw new ApiError('De server is niet bereikbaar.', 0, null); }
+      const data = await res.json().catch(() => ({}));
+      if (res.ok || (res.status === 422 && data.error === 'has_errors')) return data as ImportResult;
+      throw new ApiError(String(data.message ?? 'Importeren mislukt (' + res.status + ')'), res.status, data);
+    },
+    feedCheck: () => request<FeedCheck>('GET', '/admin/products/feed', undefined, true),
     saveProduct: (p: Product, isNew: boolean) =>
       request<{ product: Product }>(isNew ? 'POST' : 'PUT', isNew ? '/admin/products' : '/admin/products/' + encodeURIComponent(p.id), p, true),
     deleteProduct: (id: string) => request<{ ok: boolean }>('DELETE', '/admin/products/' + encodeURIComponent(id), undefined, true),

@@ -202,7 +202,7 @@ class AdminController extends Controller
         return response()->json(['products' => Product::with('variants')->orderBy('created_at')->orderBy('id')->get()->map(fn ($p) => $p->toApi(true))->values()]);
     }
 
-    private function productRules(?Product $product = null): array
+    public static function productRules(?Product $product = null): array
     {
         return [
             'id' => $product ? ['nullable', 'string'] : ['required', 'string', 'max:40', 'regex:/^[A-Za-z0-9_-]+$/', Rule::unique('products', 'id')],
@@ -256,7 +256,7 @@ class AdminController extends Controller
 
     public function storeProduct(Request $request): JsonResponse
     {
-        $data = $request->validate($this->productRules());
+        $data = $request->validate(self::productRules());
         $product = Product::create(['id' => $data['id']] + Product::attributesFromApi($data));
         if (! empty($data['variants'])) {
             $product->syncVariants($data['variants']);
@@ -267,7 +267,7 @@ class AdminController extends Controller
 
     public function updateProduct(Request $request, Product $product): JsonResponse
     {
-        $data = $request->validate($this->productRules($product));
+        $data = $request->validate(self::productRules($product));
         $product->update(Product::attributesFromApi($data));
         if (array_key_exists('variants', $data)) { // meegestuurd (ook leeg) = het beheer bepaalt de varianten
             $product->syncVariants($data['variants'] ?? []);

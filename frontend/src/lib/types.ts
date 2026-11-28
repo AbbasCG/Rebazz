@@ -97,6 +97,15 @@ export interface Catalog {
   products: Product[];
 }
 
+/** Resultaat van een CSV-import (voorbeeld of toegepast). */
+export interface ImportResult {
+  dryRun?: boolean; applied?: boolean; checksum: string; error?: string; message?: string;
+  summary: { create: number; update: number; unchanged: number; variantsCreate: number; variantsUpdate: number; variantsDelete: number; warnings: number };
+  errors: { line: number; id: string; messages: string[] }[]; errorCount: number;
+  items: { line: number; action: 'create' | 'update' | 'unchanged'; id: string; name: string; changes: string[]; variants: { create: number; update: number; delete: number } | null; warnings: string[] }[];
+}
+export interface FeedCheck { url: string; items: number; https: boolean; excluded: { id: string; name: string; reason: string }[] }
+
 /** Ingelogde medewerker van het beheer. */
 export interface StaffMe {
   name: string; email: string; role: 'owner' | 'manager' | 'support' | 'marketing'; areas: string[]; breakGlass: boolean; require2fa: boolean;

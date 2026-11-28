@@ -14,7 +14,10 @@ class ProductVariant extends Model
 
     protected static function booted(): void
     {
-        $forget = fn () => Cache::forget('shop.catalog'); // de openbare catalogus toont varianten en voorraad
+        $forget = function () { // de openbare catalogus en de productfeed tonen varianten en voorraad
+            Cache::forget('shop.catalog');
+            Cache::forget(\App\Services\ProductFeed::CACHE);
+        };
         static::saved($forget);
         static::deleted($forget);
     }

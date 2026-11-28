@@ -5,3 +5,4 @@ Disallow: /bedankt
 Disallow: /api/
 
 Sitemap: https://rebazz.nl/sitemap.xml
+# Productfeed voor advertentieplatforms: https://rebazz.nl/feeds/google.xml
