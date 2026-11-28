@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { Icon } from '../components/ui';
 import { api } from '../lib/api';
+import { trackPurchase } from '../lib/analytics';
 import { useI18n } from '../lib/i18n';
 import { useShop } from '../lib/shop';
 
@@ -17,7 +18,7 @@ export default function Thanks() {
     api.confirm(id)
       .then(o => {
         const esc = (s: string) => s.replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]!));
-        if (o.paid) { clearCart(); setMsg(t('th_text', { id: esc(o.order_no), email: esc(o.email) })); }
+        if (o.paid) { trackPurchase(o.order_no, o.total); clearCart(); setMsg(t('th_text', { id: esc(o.order_no), email: esc(o.email) })); }
         else setMsg(t('th_pending'));
       })
       .catch(() => setMsg(t('th_unknown')));

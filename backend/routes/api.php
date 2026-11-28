@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\AccountController;
 use App\Http\Controllers\AdminController;
+use App\Http\Controllers\AnalyticsController;
 use App\Http\Controllers\CustomerAuthController;
 use App\Http\Controllers\DocumentController;
 use App\Http\Controllers\MediaController;
@@ -40,6 +41,9 @@ Route::middleware(['auth:sanctum', 'abilities:customer', 'customer'])->prefix('a
     Route::get('/export', [AccountController::class, 'export'])->middleware('throttle:10,60,acct-export');
     Route::post('/erase', [AccountController::class, 'erase'])->middleware('throttle:5,60,acct-erase');
 });
+// Statistieken: alleen gebeurtenissen van bezoekers die toestemming gaven (de winkel stuurt anders niets); ruim begrensd per IP.
+Route::post('/analytics', [AnalyticsController::class, 'collect'])->middleware('throttle:240,1,analytics');
+Route::post('/analytics/forget', [AnalyticsController::class, 'forget'])->middleware('throttle:20,1,analytics-forget');
 Route::post('/withdrawal', [ShopController::class, 'withdrawal'])->middleware('throttle:5,10,withdrawal');
 Route::get('/newsletter/confirm', [ShopController::class, 'confirmNewsletter'])->middleware('throttle:30,1,nl-confirm');
 Route::post('/newsletter', [ShopController::class, 'newsletter'])->middleware('throttle:5,1,newsletter');
@@ -76,6 +80,7 @@ Route::prefix('admin')->middleware(['auth:sanctum', 'abilities:admin'])->group(f
     Route::get('/settings/{key}', [AdminController::class, 'setting']);
     Route::put('/settings/{key}', [AdminController::class, 'saveSetting']);
     Route::get('/subscribers', [AdminController::class, 'subscribers']);
+    Route::get('/analytics', [AnalyticsController::class, 'report']);
     Route::get('/newsletters', [NewsletterController::class, 'index']);
     Route::post('/newsletters', [NewsletterController::class, 'store']);
     Route::put('/newsletters/{campaign}', [NewsletterController::class, 'update']);

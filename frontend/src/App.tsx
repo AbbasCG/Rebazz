@@ -1,7 +1,8 @@
 import { AnimatePresence, MotionConfig, motion } from 'motion/react';
-import { lazy, Suspense } from 'react';
+import { lazy, Suspense, useEffect } from 'react';
 import { BrowserRouter, MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 
+import { trackPage } from './lib/analytics';
 import { SHARE } from './lib/env';
 
 /* In de deelversie (zonder server) onthoudt de app de pagina in het geheugen. */
@@ -44,6 +45,7 @@ function ShopRoutes() {
     : path === '/juridisch' ? `${t('f_legal')} — Rebazz`
     : 'Rebazz';
   usePageMeta(isProduct ? '' : path, title, !['/', '/juridisch'].includes(path));
+  useEffect(() => { trackPage(path); }, [path]); // alleen met toestemming; zie lib/analytics.ts
   return (
     <ShopProvider locale={locale}>
       <AnimatePresence mode="wait">

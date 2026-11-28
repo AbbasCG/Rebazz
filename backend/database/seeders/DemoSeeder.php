@@ -64,6 +64,31 @@ class DemoSeeder extends Seeder
     }
 
     /** Aura krijgt kleurvarianten (eigen prijs, voorraad en foto per kleur), de tafellamp een fotogalerij. */
+    /** Verzonnen, anonieme metingen voor het scherm Statistieken (vervangt eerdere demo-metingen; echte metingen blijven staan). */
+    private function demoAnalytics(\Illuminate\Support\Collection $products): void
+    {
+        \Illuminate\Support\Facades\DB::table('analytics_events')->where('vid', 'like', 'demo-visitor-%')->delete();
+        $ids = $products->pluck('id')->values()->all();
+        $sources = [[null, null], ['newsletter', null], [null, 'google.com'], [null, 'instagram.com']];
+        for ($i = 0; $i < 60; $i++) {
+            $s = $sources[$i % 4];
+            $base = ['vid' => 'demo-visitor-'.str_pad((string) $i, 6, '0', STR_PAD_LEFT).'-aaaaaaaa', 'sid' => 'demo-session-'.$i, 'src' => $s[0], 'ref' => $s[1],
+                'med' => $s[0] ? 'email' : null, 'camp' => $s[0] ? 'zomer' : null, 'device' => ['mobile', 'desktop', 'tablet'][$i % 3],
+                'created_at' => now()->subDays(($i * 7) % 30)->subMinutes($i * 13)];
+            $rows = [['type' => 'page', 'path' => '/']];
+            if ($i % 4 !== 3 && $ids) {
+                $pid = $ids[$i % count($ids)];
+                $rows[] = ['type' => 'product', 'path' => '/product/'.$pid.'/demo', 'product_id' => $pid];
+                if ($i % 3 === 0) { $rows[] = ['type' => 'cart', 'path' => '/product/'.$pid.'/demo', 'product_id' => $pid]; }
+                if ($i % 6 === 0) { $rows[] = ['type' => 'checkout', 'path' => '/checkout']; }
+                if ($i % 12 === 0) { $rows[] = ['type' => 'purchase', 'path' => '/bedankt', 'value' => 79.95]; }
+            }
+            foreach ($rows as $r) {
+                \Illuminate\Support\Facades\DB::table('analytics_events')->insert($base + $r + ['product_id' => null, 'value' => null]);
+            }
+        }
+    }
+
     private function demoVariantsAndGallery(): void
     {
         if ($p1 = Product::find('p1')) {
@@ -185,11 +210,12 @@ class DemoSeeder extends Seeder
         }
 
         $this->demoReturns();
+        $this->demoAnalytics($products);
 
         foreach (['anna@example.com' => 'nl', 'max@example.com' => 'de', 'lea@example.com' => 'fr'] as $email => $lang) {
             NewsletterSubscriber::updateOrCreate(['email' => $email], ['lang' => $lang, 'confirmed_at' => now()]);
         }
 
-        $this->command?->info('Demo klaar: '.$products->count().' actieve producten, '.count($scenarios).' bestellingen, 3 nieuwsbriefabonnees.');
+        $this->command?->info('Demo klaar: '.$products->count().' actieve producten, '.count($scenarios).' bestellingen, 3 nieuwsbriefabonnees, demo-statistieken.');
     }
 }

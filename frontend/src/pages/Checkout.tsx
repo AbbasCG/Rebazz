@@ -5,6 +5,7 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Icon, MButton, ThemeToggle } from '../components/ui';
 import { api, ApiError } from '../lib/api';
+import { trackCheckout } from '../lib/analytics';
 import { useI18n } from '../lib/i18n';
 import { quote } from '../lib/quote';
 import { deliveryWindow, useShop } from '../lib/shop';
@@ -70,6 +71,7 @@ export default function Checkout() {
     setBusy(true);
     try {
       const items = q.lines.map(l => ({ id: l.product.id, qty: l.qty, name: pName(l.product), ...(l.variant ? { v: l.variant.id } : {}) }));
+      trackCheckout();
       const res = await api.checkout({ items, country, ship, lang });
       window.location.href = res.url;
     } catch (e) {

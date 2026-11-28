@@ -12,6 +12,7 @@ import Automations from './views/Automations';
 import Checklist from './views/Checklist';
 import Orders from './views/Orders';
 import Newsletter from './views/Newsletter';
+import Stats from './views/Stats';
 import Privacy from './views/Privacy';
 import Returns from './views/Returns';
 import Overview from './views/Overview';
@@ -29,6 +30,7 @@ export const ROUTES = [
     { id: 'producten', label: 'Producten', icon: 'package', sub: 'Assortiment, prijzen, foto’s en CJ-koppeling' },
     { id: 'studio', label: 'AI-videostudio', icon: 'video', ai: true, sub: 'Advertentievideo’s voor elk platform' },
     { id: 'advertenties', label: 'Advertenties', icon: 'megaphone', sub: 'Campagnes op Meta, TikTok, Google en Pinterest' },
+    { id: 'statistieken', label: 'Statistieken', icon: 'trending', sub: 'Bezoekers, funnel, producten en bronnen (alleen met toestemming)' },
     { id: 'nieuwsbrief', label: 'Nieuwsbrief', icon: 'mail', sub: 'Mails aan bevestigde abonnees; herinnering verlaten winkelwagen' }
   ] },
   { group: 'Operatie', items: [
@@ -192,6 +194,7 @@ function Shell({ onLogout }: { onLogout: () => void }) {
               <Route path="retouren" element={<Returns />} />
               <Route path="klantenservice" element={<Support />} />
               <Route path="automatisering" element={<Automations />} />
+              <Route path="statistieken" element={<Stats />} />
               <Route path="nieuwsbrief" element={<Newsletter />} />
               <Route path="privacy" element={<Privacy />} />
               <Route path="belasting" element={<Tax />} />

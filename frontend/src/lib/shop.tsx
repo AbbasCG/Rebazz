@@ -2,6 +2,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import fallbackCatalog from '../data/catalog.json';
 import { api } from './api';
+import { trackCart } from './analytics';
 import { CURRENCIES } from './i18n';
 import { load, loadText, save, saveText } from './storage';
 import type { CartLine, Catalog } from './types';
@@ -50,6 +51,7 @@ export function ShopProvider({ children, locale }: { children: ReactNode; locale
   const addToCart = useCallback((id: string, qty = 1, v?: number) => {
     const max = maxFor(id, v);
     if (max < 1) return;
+    trackCart(id);
     setCart(c => {
       const line = c.find(l => l.id === id && l.v === v);
       return line ? c.map(l => (l === line ? { ...l, qty: Math.min(max, l.qty + qty) } : l)) : [...c, { id, qty: Math.min(max, qty), ...(v ? { v } : {}) }];

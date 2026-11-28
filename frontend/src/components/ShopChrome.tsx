@@ -3,6 +3,7 @@ import { AnimatePresence, motion } from 'motion/react';
 import { createContext, useContext, useEffect, useState, type FormEvent, type ReactNode } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { api } from '../lib/api';
+import { trackProduct } from '../lib/analytics';
 import { SHARE } from '../lib/env';
 import { getConsent, onOpenCookieSettings, openCookieSettings, setConsent } from '../lib/consent';
 import { CURRENCIES, useI18n } from '../lib/i18n';
@@ -262,6 +263,7 @@ export function ProductDetail({ p, onAdded }: { p: Product; onAdded: () => void 
   const { t, pName, pDesc, pFeatures, category, country: countryName, locale, lang } = useI18n();
   const { catalog, money, country, setCountry, addToCart } = useShop();
   const toast = useToast();
+  useEffect(() => { trackProduct(p.id); }, [p.id]); // alleen met toestemming
   const [qty, setQtyState] = useState(1);
   const variants = p.variants ?? [];
   const options = p.options ?? [];

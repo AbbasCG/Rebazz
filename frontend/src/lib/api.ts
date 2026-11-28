@@ -1,5 +1,5 @@
 /* Verbinding met de Laravel-API. In ontwikkeling stuurt Vite /api door naar Laravel. */
-import type { AccountOrder, Campaign, CampaignInput, AccountOrderDetail, AdminReturn, Catalog, Order, Product, TrackedOrder } from './types';
+import type { AccountOrder, AnalyticsReport, Campaign, CampaignInput, AccountOrderDetail, AdminReturn, Catalog, Order, Product, TrackedOrder } from './types';
 
 export class ApiError extends Error {
   status: number;
@@ -154,6 +154,7 @@ export const api = {
     setting: <T>(key: string) => request<{ value: T | null }>('GET', '/admin/settings/' + key, undefined, true),
     saveSetting: (key: string, value: unknown) => request<{ value: unknown }>('PUT', '/admin/settings/' + key, { value }, true),
     subscribers: () => request<{ subscribers: { email: string; lang: string; created_at: string }[] }>('GET', '/admin/subscribers', undefined, true),
+    analytics: (days: number) => request<AnalyticsReport>('GET', '/admin/analytics?days=' + days, undefined, true),
     newsletters: () => request<{ campaigns: Campaign[]; subscribers: number; byLang: Record<string, number> }>('GET', '/admin/newsletters', undefined, true),
     saveNewsletter: (id: number | null, body: CampaignInput) => request<Campaign>(id ? 'PUT' : 'POST', '/admin/newsletters' + (id ? '/' + id : ''), body, true),
     deleteNewsletter: (id: number) => request<{ ok: boolean }>('DELETE', '/admin/newsletters/' + id, undefined, true),

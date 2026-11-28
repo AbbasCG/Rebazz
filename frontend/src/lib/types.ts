@@ -97,6 +97,21 @@ export interface Catalog {
   products: Product[];
 }
 
+/** Statistieken-rapport (alleen bezoekers die toestemming gaven). */
+export interface AnalyticsReport {
+  days: number; from: string; retentionMonths: number;
+  totals: { visitors: number; sessions: number; pageviews: number };
+  series: { date: string; visitors: number; pageviews: number }[];
+  funnel: { visitors: number; product: number; cart: number; checkout: number; purchase: number };
+  tracked: { purchases: number; revenue: number };
+  orders: { count: number; revenue: number };
+  products: { id: string; name: string; views: number; carts: number }[];
+  pages: { path: string; views: number; visitors: number }[];
+  sources: { source: string; sessions: number; purchases: number; revenue: number }[];
+  campaigns: { campaign: string; source: string | null; medium: string | null; sessions: number; purchases: number; revenue: number }[];
+  devices: { device: string; sessions: number }[];
+}
+
 /** Nieuwsbrief-campagne in het beheer. */
 export interface Campaign {
   id: number; subject: string; body: string; cta_label: string | null; cta_url: string | null; lang: string | null;

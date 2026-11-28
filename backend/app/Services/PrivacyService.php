@@ -159,6 +159,7 @@ class PrivacyService
         // Klantaccounts: verlopen inlogcodes opruimen en accounts die 3 jaar niet zijn gebruikt verwijderen (opslagbeperking).
         \App\Models\LoginCode::where('expires_at', '<', now()->subDay())->delete();
         app(MarketingService::class)->prune();
+        app(AnalyticsService::class)->prune();
         $stale = \App\Models\Customer::where(fn ($q) => $q->where('last_login_at', '<', now()->subYears(3))->orWhere(fn ($n) => $n->whereNull('last_login_at')->where('created_at', '<', now()->subYears(3))))->pluck('id');
         if ($stale->isNotEmpty()) {
             DB::table('personal_access_tokens')->where('tokenable_type', \App\Models\Customer::class)->whereIn('tokenable_id', $stale)->delete();
