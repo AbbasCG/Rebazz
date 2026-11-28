@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\AccountController;
+use App\Http\Controllers\AdminAccountController;
 use App\Http\Controllers\AdminController;
 use App\Http\Controllers\AnalyticsController;
 use App\Http\Controllers\CustomerAuthController;
@@ -10,6 +11,7 @@ use App\Http\Controllers\NewsletterController;
 use App\Http\Controllers\PrivacyController;
 use App\Http\Controllers\ReturnController;
 use App\Http\Controllers\ShopController;
+use App\Http\Controllers\TeamController;
 use Illuminate\Support\Facades\Route;
 
 /* ---------- Webwinkel (openbaar) ---------- */
@@ -55,36 +57,74 @@ Route::post('/stripe/webhook', [ShopController::class, 'stripeWebhook'])->middle
 /* ---------- Beheer ---------- */
 Route::post('/admin/login', [AdminController::class, 'login'])->middleware('throttle:5,1,admin-login');
 
-Route::prefix('admin')->middleware(['auth:sanctum', 'abilities:admin'])->group(function () {
-    Route::post('/uploads', [MediaController::class, 'upload'])->middleware('throttle:60,1,uploads');
-    Route::post('/logout', [AdminController::class, 'logout']);
-    Route::get('/status', [AdminController::class, 'status']);
-    Route::get('/orders', [AdminController::class, 'orders']);
-    Route::patch('/orders/{order}', [AdminController::class, 'updateOrder']);
-    Route::get('/orders/{order}/invoice', [DocumentController::class, 'invoice']);
-    Route::get('/orders/{order}/credit-note', [DocumentController::class, 'creditNote']);
-    Route::get('/privacy/lookup', [PrivacyController::class, 'lookup']);
-    Route::get('/privacy/export', [PrivacyController::class, 'adminExport']);
-    Route::post('/privacy/erase', [PrivacyController::class, 'adminErase']);
-    Route::get('/privacy/requests', [PrivacyController::class, 'log']);
-    Route::get('/returns', [ReturnController::class, 'index']);
-    Route::get('/returns/{return}/credit-note', [DocumentController::class, 'returnCreditNote']);
-    Route::post('/returns/{return}/{action}', [ReturnController::class, 'action'])->whereIn('action', ['approve', 'reject', 'receive', 'refund']);
-    Route::post('/orders/{order}/{action}', [AdminController::class, 'orderAction'])->whereIn('action', ['refund', 'notify', 'cj-order', 'cj-check']);
-    Route::post('/cj-sync', [AdminController::class, 'cjSync']);
-    Route::get('/products', [AdminController::class, 'products']);
-    Route::post('/products', [AdminController::class, 'storeProduct']);
-    Route::put('/products/{product}', [AdminController::class, 'updateProduct']);
-    Route::delete('/products/{product}', [AdminController::class, 'destroyProduct']);
-    Route::get('/tax', [AdminController::class, 'tax']);
-    Route::get('/settings/{key}', [AdminController::class, 'setting']);
-    Route::put('/settings/{key}', [AdminController::class, 'saveSetting']);
-    Route::get('/subscribers', [AdminController::class, 'subscribers']);
-    Route::get('/analytics', [AnalyticsController::class, 'report']);
-    Route::get('/newsletters', [NewsletterController::class, 'index']);
-    Route::post('/newsletters', [NewsletterController::class, 'store']);
-    Route::put('/newsletters/{campaign}', [NewsletterController::class, 'update']);
-    Route::delete('/newsletters/{campaign}', [NewsletterController::class, 'destroy']);
-    Route::post('/newsletters/{campaign}/test', [NewsletterController::class, 'test'])->middleware('throttle:10,1,nl-test');
-    Route::post('/newsletters/{campaign}/send', [NewsletterController::class, 'send']);
+// Elke route hieronder vereist een actief personeelsaccount met het juiste werkgebied (zie User::ROLES) en, met SHOP_REQUIRE_2FA=on, 2FA.
+// Wijzigende acties komen in het activiteitenlogboek (audit).
+Route::prefix('admin')->middleware(['auth:sanctum', 'abilities:admin', 'audit'])->group(function () {
+    // Eigen account: werkt ook vóór 2FA is ingesteld (anders zou verplichte 2FA zichzelf blokkeren).
+    Route::middleware('staff.self')->group(function () {
+        Route::post('/logout', [AdminController::class, 'logout']);
+        Route::get('/me', [AdminAccountController::class, 'me']);
+        Route::put('/me/password', [AdminAccountController::class, 'changePassword'])->middleware('throttle:10,10,admin-pw');
+        Route::post('/me/2fa/setup', [AdminAccountController::class, 'setup'])->middleware('throttle:10,10,admin-2fa-setup');
+        Route::post('/me/2fa/enable', [AdminAccountController::class, 'enable'])->middleware('throttle:10,10,admin-2fa-enable');
+        Route::post('/me/2fa/disable', [AdminAccountController::class, 'disable'])->middleware('throttle:10,10,admin-2fa-disable');
+        Route::post('/me/2fa/recovery', [AdminAccountController::class, 'recovery'])->middleware('throttle:10,10,admin-2fa-recovery');
+    });
+
+    Route::middleware('staff:any')->group(function () {
+        Route::get('/status', [AdminController::class, 'status']);
+        Route::get('/settings/{key}', [AdminController::class, 'setting']);
+        Route::put('/settings/{key}', [AdminController::class, 'saveSetting']); // per sleutel gecontroleerd in de controller
+    });
+
+    Route::middleware('staff:team')->group(function () {
+        Route::get('/team', [TeamController::class, 'index']);
+        Route::post('/team', [TeamController::class, 'store'])->middleware('throttle:20,10,admin-team');
+        Route::get('/team/audit', [TeamController::class, 'audit']);
+        Route::put('/team/{user}', [TeamController::class, 'update']);
+        Route::delete('/team/{user}', [TeamController::class, 'destroy']);
+        Route::post('/team/{user}/reset-2fa', [TeamController::class, 'resetTwoFactor']);
+    });
+
+    Route::middleware('staff:orders')->group(function () {
+        Route::get('/orders', [AdminController::class, 'orders']);
+        Route::patch('/orders/{order}', [AdminController::class, 'updateOrder']);
+        Route::get('/orders/{order}/invoice', [DocumentController::class, 'invoice']);
+        Route::get('/orders/{order}/credit-note', [DocumentController::class, 'creditNote']);
+        Route::post('/orders/{order}/{action}', [AdminController::class, 'orderAction'])->whereIn('action', ['notify', 'cj-order', 'cj-check']);
+        Route::post('/cj-sync', [AdminController::class, 'cjSync']);
+    });
+    Route::middleware('staff:refunds')->group(function () {
+        Route::post('/orders/{order}/refund', [AdminController::class, 'orderAction'])->defaults('action', 'refund');
+        Route::post('/returns/{return}/refund', [ReturnController::class, 'action'])->defaults('action', 'refund');
+    });
+    Route::middleware('staff:returns')->group(function () {
+        Route::get('/returns', [ReturnController::class, 'index']);
+        Route::get('/returns/{return}/credit-note', [DocumentController::class, 'returnCreditNote']);
+        Route::post('/returns/{return}/{action}', [ReturnController::class, 'action'])->whereIn('action', ['approve', 'reject', 'receive']);
+    });
+    Route::middleware('staff:privacy')->group(function () {
+        Route::get('/privacy/lookup', [PrivacyController::class, 'lookup']);
+        Route::get('/privacy/export', [PrivacyController::class, 'adminExport']);
+        Route::post('/privacy/erase', [PrivacyController::class, 'adminErase']);
+        Route::get('/privacy/requests', [PrivacyController::class, 'log']);
+    });
+    Route::middleware('staff:products')->group(function () {
+        Route::post('/uploads', [MediaController::class, 'upload'])->middleware('throttle:60,1,uploads');
+        Route::get('/products', [AdminController::class, 'products']);
+        Route::post('/products', [AdminController::class, 'storeProduct']);
+        Route::put('/products/{product}', [AdminController::class, 'updateProduct']);
+        Route::delete('/products/{product}', [AdminController::class, 'destroyProduct']);
+    });
+    Route::middleware('staff:tax')->get('/tax', [AdminController::class, 'tax']);
+    Route::middleware('staff:marketing')->group(function () {
+        Route::get('/subscribers', [AdminController::class, 'subscribers']);
+        Route::get('/analytics', [AnalyticsController::class, 'report']);
+        Route::get('/newsletters', [NewsletterController::class, 'index']);
+        Route::post('/newsletters', [NewsletterController::class, 'store']);
+        Route::put('/newsletters/{campaign}', [NewsletterController::class, 'update']);
+        Route::delete('/newsletters/{campaign}', [NewsletterController::class, 'destroy']);
+        Route::post('/newsletters/{campaign}/test', [NewsletterController::class, 'test'])->middleware('throttle:10,1,nl-test');
+        Route::post('/newsletters/{campaign}/send', [NewsletterController::class, 'send']);
+    });
 });

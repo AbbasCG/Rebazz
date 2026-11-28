@@ -30,6 +30,7 @@ GPSR-gegevens en CJ-variant-ID in via het beheer (`/beheer`) voordat u ze active
   `* * * * * cd /pad/backend && php artisan schedule:run >> /dev/null 2>&1`
 - Een queue-worker is **niet** nodig (`QUEUE_CONNECTION=sync`; er worden geen jobs in een wachtrij gezet).
 - Achter een proxy/Cloudflare: zet `TRUSTED_PROXIES` in `.env`, anders ziet de app alleen het proxy-IP (gedeelde limieten, geen HSTS).
+- **Beheeraccounts en 2FA:** de eigenaar logt in met `ADMIN_PASSWORD` (laat het e-mailveld leeg); medewerkers krijgen onder *Team & rollen* een eigen account met rol (Manager, Klantenservice, Marketing, Eigenaar), zodat niemand het eigenaarswachtwoord hoeft te kennen. Iedereen kan onder *Mijn account* tweestapsverificatie (authenticator-app + 8 herstelcodes) aanzetten; met `SHOP_REQUIRE_2FA=on` is het verplicht voor het hele beheer (aanbevolen: zet het aan en stel eerst uw eigen 2FA in). Terugbetalen mogen alleen Eigenaar en Manager; de eigenaar ziet het activiteitenlogboek (12 maanden). Bent u uw telefoon én herstelcodes kwijt: `php artisan staff:reset-2fa <e-mail>` op de server (ook voor het eigenaarsaccount `admin@rebazz.local`).
 - Na het wijzigen van `ADMIN_PASSWORD` blijven bestaande beheer-tokens tot 7 dagen geldig. Trek ze direct in met:
   `php artisan tinker --execute="Laravel\Sanctum\PersonalAccessToken::query()->delete();"`
 - Nieuwsbriefaanmeldingen gebruiken dubbele opt-in: de bevestigingslink verwijst naar `APP_URL` (`/api/newsletter/confirm`), dus `APP_URL` moet het echte https-domein zijn en mail moet werken.

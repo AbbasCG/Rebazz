@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Mail\OrderStatusMail;
+use App\Models\AdminAuditLog;
 use App\Models\NewsletterSubscriber;
 use App\Models\Order;
 use App\Models\Product;
@@ -13,6 +14,7 @@ use App\Services\InvoiceService;
 use App\Services\StockService;
 use App\Services\StripeGateway;
 use App\Services\TaxService;
+use App\Services\TwoFactorService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
@@ -26,24 +28,76 @@ class AdminController extends Controller
 {
     private const SETTING_KEYS = ['brand', 'checklist', 'automations', 'campaigns', 'videos', 'reviews', 'tax.oss'];
 
+    /**
+     * Inloggen. Zonder e-mailadres: de eigenaar met ADMIN_PASSWORD. Met e-mailadres: een medewerker met eigen wachtwoord.
+     * Heeft het account tweestapsverificatie, dan is ook een code (of herstelcode) nodig; zonder code volgt 422 "two_factor_required".
+     */
     public function login(Request $request): JsonResponse
     {
-        $data = $request->validate(['password' => ['required', 'string', 'max:200']]);
-        $expected = (string) config('shop.admin_password');
-        if (strlen($expected) < 10) {
-            return response()->json(['message' => 'Stel ADMIN_PASSWORD in (minimaal 10 tekens) in het .env-bestand.'], 503);
-        }
+        $data = $request->validate(['email' => ['nullable', 'email', 'max:200'], 'password' => ['required', 'string', 'max:200'], 'code' => ['nullable', 'string', 'max:20']]);
+        $email = strtolower(trim((string) ($data['email'] ?? '')));
         $lockKey = 'admin-login:'.$request->ip();
         if (RateLimiter::tooManyAttempts($lockKey, 20)) {
             return response()->json(['message' => 'Te veel mislukte pogingen. Probeer het later opnieuw.'], 429);
         }
-        if (! hash_equals($expected, $data['password'])) {
+        $fail = function (string $why, string $message = 'Onjuiste inloggegevens.') use ($lockKey, $email) {
             RateLimiter::hit($lockKey, 3600); // naast throttle:5,1: maximaal 20 mislukte pogingen per uur per IP
-            return response()->json(['message' => 'Onjuist wachtwoord.'], 401);
+            AdminAuditLog::record(null, 'login mislukt', $why, $email ?: 'eigenaar');
+
+            return response()->json(['message' => $message], 401);
+        };
+
+        if ($email !== '') {
+            $userLock = 'admin-login-user:'.$email;
+            if (RateLimiter::tooManyAttempts($userLock, 10)) {
+                return response()->json(['message' => 'Te veel mislukte pogingen voor dit account. Probeer het later opnieuw.'], 429);
+            }
+            $user = User::whereRaw('lower(email) = ?', [$email])->where('email', '!=', User::OWNER_EMAIL)->first();
+            // Altijd een hash vergelijken, zodat de responstijd niet verraadt of het account bestaat.
+            $ok = $user ? Hash::check($data['password'], $user->password) : (bool) (Hash::make($data['password']) && false);
+            if (! $user || ! $ok || ! $user->active) {
+                RateLimiter::hit($userLock, 3600);
+
+                return $fail('onjuiste gegevens of account niet actief');
+            }
+        } else {
+            $expected = (string) config('shop.admin_password');
+            if (strlen($expected) < 10) {
+                return response()->json(['message' => 'Stel ADMIN_PASSWORD in (minimaal 10 tekens) in het .env-bestand.'], 503);
+            }
+            if (! hash_equals($expected, $data['password'])) {
+                return $fail('onjuist wachtwoord (eigenaar)', 'Onjuist wachtwoord.');
+            }
+            $user = User::firstOrCreate(['email' => User::OWNER_EMAIL], ['name' => 'Eigenaar', 'password' => Hash::make($expected)]);
+            if ($user->role !== 'owner' || ! $user->active) {
+                $user->forceFill(['role' => 'owner', 'active' => true])->save(); // het break-glass-account is altijd een actieve eigenaar
+            }
         }
+
+        if ($user->hasTwoFactor()) {
+            if (trim((string) ($data['code'] ?? '')) === '') {
+                return response()->json(['error' => 'two_factor_required', 'message' => 'Voer de code uit uw authenticator-app in.'], 422);
+            }
+            $twoLock = 'admin-2fa:'.$user->id;
+            if (RateLimiter::tooManyAttempts($twoLock, 5)) {
+                return response()->json(['message' => 'Te veel foute codes. Probeer het over 15 minuten opnieuw.'], 429);
+            }
+            if (! app(TwoFactorService::class)->check($user, (string) $data['code'])) {
+                RateLimiter::hit($twoLock, 900);
+                AdminAuditLog::record($user, 'login mislukt', 'onjuiste 2FA-code');
+
+                return response()->json(['message' => 'Onjuiste of verlopen code.'], 401);
+            }
+            RateLimiter::clear($twoLock);
+        }
+
         RateLimiter::clear($lockKey);
-        $user = User::firstOrCreate(['email' => 'admin@rebazz.local'], ['name' => 'Eigenaar', 'password' => Hash::make($expected)]);
+        if ($email !== '') {
+            RateLimiter::clear('admin-login-user:'.$email);
+        }
         $user->tokens()->where('expires_at', '<', now())->delete();
+        $user->forceFill(['last_login_at' => now()])->save();
+        AdminAuditLog::record($user, 'login', $user->hasTwoFactor() ? 'met 2FA' : 'zonder 2FA');
 
         return response()->json(['token' => $user->createToken('dashboard', ['admin'], now()->addDays(7))->plainTextToken]);
     }
@@ -251,6 +305,9 @@ class AdminController extends Controller
     public function saveSetting(Request $request, string $key): JsonResponse
     {
         abort_unless($this->allowedKey($key), 404);
+        // Schrijven per sleutel: advertentie-/video-/reviewinstellingen zijn marketing, btw-gegevens "tax", de rest "settings".
+        $area = in_array($key, ['campaigns', 'videos', 'reviews'], true) ? 'marketing' : (str_starts_with($key, 'tax.') ? 'tax' : 'settings');
+        abort_unless($request->user()->canArea($area), 403, 'Uw rol mag deze instelling niet wijzigen.');
         $value = $request->input('value');
         $rule = match (true) {
             $key === 'tax.oss' => ['value' => ['required', 'boolean']],

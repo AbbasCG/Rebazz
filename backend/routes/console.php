@@ -84,3 +84,17 @@ Schedule::command('shop:cart-reminders')->everyTenMinutes()->withoutOverlapping(
 Schedule::command('shop:send-newsletters')->everyMinute()->withoutOverlapping();
 
 Schedule::command('shop:gdpr-retention')->dailyAt('03:30')->withoutOverlapping();
+
+/* Noodgeval: tweestapsverificatie van een medewerker uitzetten (telefoon kwijt en geen herstelcodes). Alleen met toegang tot de server. */
+Artisan::command('staff:reset-2fa {email}', function (\App\Services\TwoFactorService $tf, string $email) {
+    $u = \App\Models\User::whereRaw('lower(email) = ?', [strtolower($email)])->first();
+    if (! $u) {
+        $this->error('Geen medewerker met dit e-mailadres.');
+
+        return 1;
+    }
+    $tf->disable($u);
+    $u->tokens()->delete();
+    \App\Models\AdminAuditLog::record(null, '2FA gereset via server', $u->email, 'server (artisan)');
+    $this->info('Tweestapsverificatie uitgezet voor '.$u->email.'. De medewerker stelt het bij de volgende login opnieuw in.');
+})->purpose('Zet tweestapsverificatie van een medewerker uit (noodgeval)');

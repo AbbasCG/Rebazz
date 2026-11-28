@@ -97,6 +97,14 @@ export interface Catalog {
   products: Product[];
 }
 
+/** Ingelogde medewerker van het beheer. */
+export interface StaffMe {
+  name: string; email: string; role: 'owner' | 'manager' | 'support' | 'marketing'; areas: string[]; breakGlass: boolean; require2fa: boolean;
+  twoFactor: { enabled: boolean; recoveryLeft: number; since: string | null };
+}
+export interface TeamMember { id: number; name: string; email: string; role: StaffMe['role']; active: boolean; twoFactor: boolean; lastLogin: string | null; breakGlass: boolean }
+export interface AuditEntry { id: number; user_label: string | null; action: string; detail: string | null; ip: string | null; created_at: string }
+
 /** Statistieken-rapport (alleen bezoekers die toestemming gaven). */
 export interface AnalyticsReport {
   days: number; from: string; retentionMonths: number;

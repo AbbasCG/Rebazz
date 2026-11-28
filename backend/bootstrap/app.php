@@ -16,9 +16,14 @@ return Application::configure(basePath: dirname(__DIR__))
         // Achter nginx/Cloudflare/load balancer: vertrouw die proxy zodat IP's, https en HSTS kloppen (TRUSTED_PROXIES=* of lijst).
         $middleware->trustProxies(at: env('TRUSTED_PROXIES') ? (env('TRUSTED_PROXIES') === '*' ? '*' : array_map('trim', explode(',', env('TRUSTED_PROXIES')))) : null);
         $middleware->append(\App\Http\Middleware\SecurityHeaders::class);
+        // Rolcontrole vóór route-model-binding: een medewerker zonder rechten krijgt 403, ook voor een bestelling die niet bestaat (geen informatie over bestaan).
+        $middleware->prependToPriorityList(before: \Illuminate\Routing\Middleware\SubstituteBindings::class, prepend: \App\Http\Middleware\EnsureStaff::class);
         $middleware->alias([
             'abilities' => \Laravel\Sanctum\Http\Middleware\CheckAbilities::class,
             'customer' => \App\Http\Middleware\EnsureCustomer::class,
+            'staff' => \App\Http\Middleware\EnsureStaff::class,
+            'staff.self' => \App\Http\Middleware\EnsureStaff::class,
+            'audit' => \App\Http\Middleware\AuditAdmin::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

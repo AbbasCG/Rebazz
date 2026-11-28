@@ -1,9 +1,12 @@
 import { createContext, useContext, type Dispatch, type SetStateAction } from 'react';
-import type { Order } from '../lib/types';
+import type { Order, StaffMe } from '../lib/types';
 
 export interface Status { stripe: string; webhook: boolean; cj: boolean; cjAutoPay: boolean; mail: boolean }
 export interface AdminData {
   status: Status;
+  me: StaffMe;
+  can: (area: string) => boolean;
+  setMe: Dispatch<SetStateAction<StaffMe | null>>;
   orders: Order[];
   setOrders: Dispatch<SetStateAction<Order[]>>;
   refresh: () => Promise<void>;

@@ -7,6 +7,9 @@
 
 return [
     'admin_password' => env('ADMIN_PASSWORD'),
+
+    // Verplicht tweestapsverificatie voor iedereen die in het beheer werkt (aanbevolen in productie).
+    'require_2fa' => env('SHOP_REQUIRE_2FA', 'off') === 'on',
     'frontend_url' => env('FRONTEND_URL', env('APP_URL')),
 
     'stripe' => [

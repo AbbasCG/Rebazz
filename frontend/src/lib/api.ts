@@ -1,5 +1,5 @@
 /* Verbinding met de Laravel-API. In ontwikkeling stuurt Vite /api door naar Laravel. */
-import type { AccountOrder, AnalyticsReport, Campaign, CampaignInput, AccountOrderDetail, AdminReturn, Catalog, Order, Product, TrackedOrder } from './types';
+import type { AccountOrder, AnalyticsReport, AuditEntry, StaffMe, TeamMember, Campaign, CampaignInput, AccountOrderDetail, AdminReturn, Catalog, Order, Product, TrackedOrder } from './types';
 
 export class ApiError extends Error {
   status: number;
@@ -102,7 +102,19 @@ export const api = {
   newsletter: (email: string, lang: string) => request<{ ok: boolean }>('POST', '/newsletter', { email, lang }),
 
   admin: {
-    login: (password: string) => request<{ token: string }>('POST', '/admin/login', { password }),
+    login: (password: string, email = '', code = '') => request<{ token: string }>('POST', '/admin/login', { password, ...(email ? { email } : {}), ...(code ? { code } : {}) }),
+    me: () => request<StaffMe>('GET', '/admin/me', undefined, true),
+    changePassword: (current_password: string, password: string) => request<{ ok: boolean }>('PUT', '/admin/me/password', { current_password, password }, true),
+    twoFactorSetup: () => request<{ secret: string; uri: string }>('POST', '/admin/me/2fa/setup', {}, true),
+    twoFactorEnable: (code: string) => request<StaffMe & { recoveryCodes: string[] }>('POST', '/admin/me/2fa/enable', { code }, true),
+    twoFactorDisable: (password: string, code: string) => request<StaffMe>('POST', '/admin/me/2fa/disable', { password, code }, true),
+    twoFactorRecovery: (password: string, code: string) => request<StaffMe & { recoveryCodes: string[] }>('POST', '/admin/me/2fa/recovery', { password, code }, true),
+    team: () => request<{ members: TeamMember[]; roles: Record<string, string[]>; require2fa: boolean }>('GET', '/admin/team', undefined, true),
+    createMember: (b: { name: string; email: string; role: string; password: string }) => request<TeamMember>('POST', '/admin/team', b, true),
+    updateMember: (id: number, b: Partial<{ name: string; role: string; active: boolean; password: string }>) => request<TeamMember>('PUT', '/admin/team/' + id, b, true),
+    deleteMember: (id: number) => request<{ ok: boolean }>('DELETE', '/admin/team/' + id, undefined, true),
+    resetMember2fa: (id: number) => request<TeamMember>('POST', '/admin/team/' + id + '/reset-2fa', {}, true),
+    audit: () => request<{ log: AuditEntry[] }>('GET', '/admin/team/audit', undefined, true),
     logout: () => request<{ ok: boolean }>('POST', '/admin/logout', {}, true),
     status: () => request<{ stripe: string; webhook: boolean; cj: boolean; cjAutoPay: boolean; mail: boolean }>('GET', '/admin/status', undefined, true),
     orders: () => request<{ orders: Order[] }>('GET', '/admin/orders', undefined, true),
